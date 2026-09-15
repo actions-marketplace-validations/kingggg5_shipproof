@@ -124,6 +124,42 @@ class CoverageLedgerTests(unittest.TestCase):
             self.assertEqual(completeness["assets"], 1)
             self.assertEqual(completeness["excluded"], 1)
 
+    def test_generated_sarif_report_is_asset_not_unknown_binary(self):
+        snippet = 'AWS_SECRET_ACCESS_KEY = "' + "A" * 40 + '"\n'
+        sarif = json.dumps(
+            {
+                "version": "2.1.0",
+                "runs": [
+                    {
+                        "results": [
+                            {
+                                "message": {"text": snippet},
+                                "locations": [
+                                    {
+                                        "physicalLocation": {
+                                            "artifactLocation": {"uri": "app.py"},
+                                            "region": {
+                                                "startLine": 1,
+                                                "snippet": {"text": snippet},
+                                            },
+                                        }
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ],
+            }
+        )
+        with make_repo({"app.py": "value = 1\n", "shipproof.sarif": sarif}) as tmp:
+            findings, stats = scan_repository(Path(tmp))
+            completeness = stats["completeness"]
+            self.assertTrue(completeness["is_complete"])
+            self.assertEqual(completeness["reasons"], [])
+            self.assertEqual(completeness["assets"], 1)
+            self.assertEqual(completeness["binary"], 0)
+            self.assertEqual(findings, [])
+
     def test_unreadable_file_makes_scan_incomplete(self):
         with make_repo({"broken.py": "value = 1\n"}) as tmp:
             real_open = scan_repo.os.open

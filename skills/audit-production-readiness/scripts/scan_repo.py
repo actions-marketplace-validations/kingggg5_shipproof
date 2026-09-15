@@ -13223,10 +13223,12 @@ CONTAINER_SUFFIXES = frozenset(
     }
 )
 
-# Known static assets and compiled artifacts: deliberately out of scope for a
-# source scanner, counted for visibility but never treated as omitted content.
+# Known static assets, compiled artifacts, and generated reports: deliberately
+# out of scope for a source scanner, counted for visibility but never treated
+# as omitted content.
 ASSET_SUFFIXES = frozenset(
     {
+        ".sarif",
         ".png",
         ".jpg",
         ".jpeg",

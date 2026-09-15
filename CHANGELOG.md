@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Treat generated `.sarif` reports as recognized assets so a leftover Action/CLI report is not an unknown-binary coverage hole and is not re-scanned as source.
+
 ## 0.11.1 - 2026-09-15
 
 - Follow host PATH symlinks such as Linux `python3` when resolving trusted executables, then require the canonical target to stay a regular executable outside the repository.

@@ -156,6 +156,35 @@ test("trusted executable resolution rejects a repository symlink PATH parent", (
   }
 });
 
+test("trusted executable resolution follows a host PATH symlink", (context) => {
+  const root = mkdtempSync(join(tmpdir(), "shipproof-executable-hostlink-root-"));
+  const outside = mkdtempSync(join(tmpdir(), "shipproof-executable-hostlink-host-"));
+  const filename = process.platform === "win32" ? "py.exe" : "py";
+  try {
+    const outsideCommand = join(outside, filename);
+    writeFileSync(outsideCommand, "trusted", "utf8");
+    if (process.platform !== "win32") chmodSync(outsideCommand, 0o755);
+    const linkedName = process.platform === "win32" ? "python3.exe" : "python3";
+    const linkedCommand = join(outside, linkedName);
+    try {
+      symlinkSync(outsideCommand, linkedCommand);
+    } catch (error) {
+      context.skip(`symlink creation unavailable: ${error.code || error.message}`);
+      return;
+    }
+    assert.equal(
+      resolveTrustedExecutable(process.platform === "win32" ? "python3.exe" : "python3", {
+        root,
+        environment: { PATH: outside },
+      }),
+      realpathSync.native(outsideCommand),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
 test("MCP environment validation is lazy and bounded", () => {
   const previous = process.env.SHIPPROOF_MCP_TIMEOUT_MS;
   process.env.SHIPPROOF_MCP_TIMEOUT_MS = "invalid";

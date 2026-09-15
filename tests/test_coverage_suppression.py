@@ -66,6 +66,29 @@ class CoverageLedgerTests(unittest.TestCase):
                 report["limitations"],
             )
 
+    def test_oversized_file_in_skip_tree_does_not_fail_completeness(self):
+        with make_repo(
+            {
+                "app.py": "value = 1\n",
+                "research/catalog.json": "x" * 40,
+                "node_modules/pkg/big.json": "x" * 40,
+            }
+        ) as tmp:
+            findings, stats = scan_repository(
+                Path(tmp),
+                max_file_bytes=20,
+                include_paths=frozenset(
+                    {"app.py", "research/catalog.json", "node_modules/pkg/big.json"}
+                ),
+            )
+            completeness = stats["completeness"]
+            self.assertTrue(completeness["is_complete"])
+            self.assertEqual(completeness["reasons"], [])
+            self.assertEqual(completeness["oversized"], 0)
+            self.assertEqual(completeness["excluded"], 2)
+            self.assertEqual(stats["files_scanned"], 1)
+            self.assertEqual(findings, [])
+
     def test_overlong_line_makes_scan_incomplete_before_regex_matching(self):
         source = "SELECT * FROM " + ("a" * (scan_repo.MAX_SCAN_LINE_CHARS + 1))
         with make_repo({"query.sql": source}) as tmp:

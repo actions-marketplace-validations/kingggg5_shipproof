@@ -36,7 +36,7 @@ from pathlib import Path
 import archive_inspect
 import precision as precision_policy
 
-VERSION = "0.11.0"
+VERSION = "0.11.1"
 MAX_SNIPPET_BYTES = 200_000
 MAX_SCAN_LINE_CHARS = 8_192
 CONTEXT_LEVELS = ("summary", "overview", "full")
@@ -72,6 +72,7 @@ SKIP_DIRS = {
     ".cache",
     ".npm-cache",
     ".shipproof-research-cache",
+    "research",
     ".pytest_cache",
     ".mypy_cache",
     ".ruff_cache",
@@ -13443,6 +13444,11 @@ def iter_scannable_files(
                 continue
             if file_stat.st_size <= max_file_bytes:
                 yield path, relative_path, None
+            elif inside_ignored_tree:
+                # Git-index/include hatches re-enter skip trees for tracked
+                # source. Oversized catalogs in those trees stay omitted without
+                # failing the completeness gate of the selected application.
+                yield path, relative_path, "excluded"
             else:
                 yield path, relative_path, "size"
     # Keep only a count: a tree full of denied directories must not allocate an

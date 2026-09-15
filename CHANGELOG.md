@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.11.1 - 2026-09-15
+
+- Follow host PATH symlinks such as Linux `python3` when resolving trusted executables, then require the canonical target to stay a regular executable outside the repository.
+- Skip `research/` by default and treat oversized Git-index hatches inside ignored trees as exclusions so giant research catalogs do not fail the completeness gate; oversized application source still does. See [docs/releases/v0.11.1.md](docs/releases/v0.11.1.md).
+
 ## 0.11.0 - 2026-09-15
 
 - Publish the precision, coverage, and trust-boundary work as the `0.11.0` release boundary; see [docs/releases/v0.11.0.md](docs/releases/v0.11.0.md).

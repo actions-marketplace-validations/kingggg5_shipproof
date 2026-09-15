@@ -1,6 +1,6 @@
 # ShipProof rule assurance inventory
 
-Version: `0.11.0`
+Version: `0.11.1`
 
 | Status | Rules | Meaning |
 | --- | ---: | --- |

@@ -233,6 +233,10 @@
           {
             "path": "contract-fixtures/python/sp307-negative_b/service.py",
             "source_hex": "666f72207573657220696e2075736572733a0a2020202075736528757365722e6361636865645f70726f66696c65290a"
+          },
+          {
+            "path": "contract-fixtures/python/sp307-negative_c/service.py",
+            "source_hex": "696d706f727420666e6d617463680a666f72206e616d6520696e206e616d65733a0a20202020666e6d617463682e66696c746572286e616d65732c20272a2e707927290a"
           }
         ],
         "adversarial": [

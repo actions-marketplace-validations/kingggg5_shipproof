@@ -1,0 +1,246 @@
+{
+  "schema_version": 1,
+  "reviewed_at": "2026-09-15",
+  "policy": "Packages are installed at exact versions into an isolated workspace. Only scannable source files are digested. Finding counts stay unlabeled until maintainers add JSONL records. This corpus is a quiet-code baseline, not a proof that the packages are vulnerability-free.",
+  "packages": [
+    {
+      "name": "flask",
+      "ecosystem": "python",
+      "version": "3.1.3",
+      "pypi": "Flask",
+      "import_name": "flask",
+      "license_spdx": "BSD-3-Clause",
+      "source_sha256": "5293e154cb0d8b93cc05521693900012b5fa8211afc67441e18feec441f26c5a"
+    },
+    {
+      "name": "requests",
+      "ecosystem": "python",
+      "version": "2.33.1",
+      "pypi": "requests",
+      "import_name": "requests",
+      "license_spdx": "Apache-2.0",
+      "source_sha256": "2e1a64e19857c433fef6e850b6ed6b5e3a96550d93dafcbfec08fa3431acefa4"
+    },
+    {
+      "name": "fastapi",
+      "ecosystem": "python",
+      "version": "0.140.12",
+      "pypi": "fastapi",
+      "import_name": "fastapi",
+      "license_spdx": "MIT",
+      "source_sha256": "97a51367609c3acd17d2833512884a1f78d4293099136ac4c0b46d9f872e7e29"
+    },
+    {
+      "name": "werkzeug",
+      "ecosystem": "python",
+      "version": "3.1.8",
+      "pypi": "Werkzeug",
+      "import_name": "werkzeug",
+      "license_spdx": "BSD-3-Clause",
+      "source_sha256": "e258d3829191550a2f2f8d1e27c903aa62a927695a5dcbca0108df6c4910fc7f"
+    },
+    {
+      "name": "httpx",
+      "ecosystem": "python",
+      "version": "0.28.1",
+      "pypi": "httpx",
+      "import_name": "httpx",
+      "license_spdx": "BSD-3-Clause",
+      "source_sha256": "6b49d3bb7f0aa995da547e8a2532f9b36137d319d952fd507292d6408758040f"
+    },
+    {
+      "name": "click",
+      "ecosystem": "python",
+      "version": "8.3.3",
+      "pypi": "click",
+      "import_name": "click",
+      "license_spdx": "BSD-3-Clause",
+      "source_sha256": "ff9c8a36395a262fb73d62bc968d96bcb2a5d71e4a6f87c5fc0b42cbd666b95f"
+    },
+    {
+      "name": "jinja2",
+      "ecosystem": "python",
+      "version": "3.1.6",
+      "pypi": "Jinja2",
+      "import_name": "jinja2",
+      "license_spdx": "BSD-3-Clause",
+      "source_sha256": "03258c05e68a3754d2c4218feb82b398c8c09f9a77a59b735b141c18ff08d2eb"
+    },
+    {
+      "name": "urllib3",
+      "ecosystem": "python",
+      "version": "2.6.3",
+      "pypi": "urllib3",
+      "import_name": "urllib3",
+      "license_spdx": "MIT",
+      "source_sha256": "071a2fc706ef7631f4e08b5e4c6dcf74d8fa8847aab4941dd7b398477c375c34"
+    },
+    {
+      "name": "pydantic",
+      "ecosystem": "python",
+      "version": "2.13.3",
+      "pypi": "pydantic",
+      "import_name": "pydantic",
+      "license_spdx": "MIT",
+      "source_sha256": "d64b8604ab048ff50ee7b9a898471ccca96bb64a4153fe34bee958ae3ec66b9e"
+    },
+    {
+      "name": "body-parser",
+      "ecosystem": "javascript",
+      "version": "2.3.0",
+      "npm": "body-parser",
+      "license_spdx": "MIT",
+      "source_sha256": "27392e012c63428a59cc6d8766c6f27ef1418e7d5f652a1004ad548f5400b641"
+    },
+    {
+      "name": "cors",
+      "ecosystem": "javascript",
+      "version": "2.8.6",
+      "npm": "cors",
+      "license_spdx": "MIT",
+      "source_sha256": "e99104f0c32acd24e0d567a03f969c921229ee1bd618069a612b1ee6fa64e7ab"
+    },
+    {
+      "name": "ajv",
+      "ecosystem": "javascript",
+      "version": "8.20.0",
+      "npm": "ajv",
+      "license_spdx": "MIT",
+      "source_sha256": "ac6ddb455aa0ed13e6b5b43ea3ca4ab3c5f902f8c6d909f41d9382c8f1a8ce3c"
+    },
+    {
+      "name": "cookie",
+      "ecosystem": "javascript",
+      "version": "0.7.2",
+      "npm": "cookie",
+      "license_spdx": "MIT",
+      "source_sha256": "e1a90570b8364fa8bd96dbdbb8cd9c9695e677db11a165d0d3ff529bee0b7e62"
+    },
+    {
+      "name": "cross-spawn",
+      "ecosystem": "javascript",
+      "version": "7.0.6",
+      "npm": "cross-spawn",
+      "license_spdx": "MIT",
+      "source_sha256": "267726562874a7581c7b5b4e21bf832706d5549182a560b28a4b2821ec066df3"
+    },
+    {
+      "name": "debug",
+      "ecosystem": "javascript",
+      "version": "4.4.3",
+      "npm": "debug",
+      "license_spdx": "MIT",
+      "source_sha256": "b0ad994a5eece245449ca06b5af8804088dd67091bc776f2bf29a7118e8937b1"
+    },
+    {
+      "name": "starlette",
+      "ecosystem": "python",
+      "version": "0.50.0",
+      "pypi": "starlette",
+      "import_name": "starlette",
+      "license_spdx": "BSD-3-Clause"
+    },
+    {
+      "name": "itsdangerous",
+      "ecosystem": "python",
+      "version": "2.2.0",
+      "pypi": "itsdangerous",
+      "import_name": "itsdangerous",
+      "license_spdx": "BSD-3-Clause"
+    },
+    {
+      "name": "markupsafe",
+      "ecosystem": "python",
+      "version": "3.0.2",
+      "pypi": "MarkupSafe",
+      "import_name": "markupsafe",
+      "license_spdx": "BSD-3-Clause"
+    },
+    {
+      "name": "sniffio",
+      "ecosystem": "python",
+      "version": "1.3.1",
+      "pypi": "sniffio",
+      "import_name": "sniffio",
+      "license_spdx": "Apache-2.0"
+    },
+    {
+      "name": "anyio",
+      "ecosystem": "python",
+      "version": "4.10.0",
+      "pypi": "anyio",
+      "import_name": "anyio",
+      "license_spdx": "MIT"
+    },
+    {
+      "name": "ms",
+      "ecosystem": "javascript",
+      "version": "2.1.3",
+      "npm": "ms",
+      "license_spdx": "MIT"
+    },
+    {
+      "name": "bytes",
+      "ecosystem": "javascript",
+      "version": "3.1.2",
+      "npm": "bytes",
+      "license_spdx": "MIT"
+    },
+    {
+      "name": "methods",
+      "ecosystem": "javascript",
+      "version": "1.1.2",
+      "npm": "methods",
+      "license_spdx": "MIT"
+    },
+    {
+      "name": "vary",
+      "ecosystem": "javascript",
+      "version": "1.1.2",
+      "npm": "vary",
+      "license_spdx": "MIT"
+    },
+    {
+      "name": "negotiator",
+      "ecosystem": "javascript",
+      "version": "0.6.4",
+      "npm": "negotiator",
+      "license_spdx": "MIT"
+    },
+    {
+      "name": "chi",
+      "ecosystem": "go",
+      "version": "v5.2.2",
+      "module": "github.com/go-chi/chi/v5",
+      "license_spdx": "MIT"
+    },
+    {
+      "name": "mux",
+      "ecosystem": "go",
+      "version": "v1.8.1",
+      "module": "github.com/gorilla/mux",
+      "license_spdx": "BSD-3-Clause"
+    },
+    {
+      "name": "pkg-errors",
+      "ecosystem": "go",
+      "version": "v0.9.1",
+      "module": "github.com/pkg/errors",
+      "license_spdx": "BSD-2-Clause"
+    },
+    {
+      "name": "anyhow",
+      "ecosystem": "rust",
+      "version": "1.0.99",
+      "crate": "anyhow",
+      "license_spdx": "MIT"
+    },
+    {
+      "name": "thiserror",
+      "ecosystem": "rust",
+      "version": "2.0.16",
+      "crate": "thiserror",
+      "license_spdx": "MIT"
+    }
+  ]
+}

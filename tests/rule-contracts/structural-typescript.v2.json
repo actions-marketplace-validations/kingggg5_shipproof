@@ -1,0 +1,113 @@
+{
+  "schema_version": 2,
+  "quality_contract_version": 2,
+  "engine": "structural",
+  "ecosystem": "typescript",
+  "rules": [
+    {
+      "rule_id": "SP599",
+      "title": "Unchecked JSON field is dereferenced through a TypeScript non-null assertion",
+      "category": "reliability",
+      "expected_severity": "high",
+      "expected_confidence": "high",
+      "cwe": "CWE-476",
+      "frameworks": [],
+      "false_positive_analysis": "Requires a local await receiver.json() assignment and immediate same-block dereference of that binding. Local field names, assertion-only expressions, guards, validation steps and separate scopes stay silent. Custom json methods returning validated data require review; aliases, intervening statements and template interpolation are unresolved.",
+      "cases": {
+        "positive": [
+          {
+            "path": "contract-fixtures/precision/sp599/positive-property/client.ts",
+            "source_hex": "6173796e632066756e6374696f6e207265616428726573706f6e736529207b0a2020636f6e7374207061796c6f6164203d20617761697420726573706f6e73652e6a736f6e28293b0a202072657475726e207061796c6f61642e64617461212e6e616d653b0a7d0a",
+            "expected_line": 3,
+            "expected_confidence": "high",
+            "expected_detection": "structural",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "a699b914af9432cd79d6a392"
+          },
+          {
+            "path": "contract-fixtures/precision/sp599/positive-index/client.ts",
+            "source_hex": "6173796e632066756e6374696f6e207265616428726573706f6e736529207b0a2020636f6e7374207061796c6f6164203d20617761697420726573706f6e73652e6a736f6e28293b0a202072657475726e207061796c6f61642e6974656d73215b305d3b0a7d0a",
+            "expected_line": 3,
+            "expected_confidence": "high",
+            "expected_detection": "structural",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "a28d0045eb57d5e643cbd1db"
+          },
+          {
+            "path": "contract-fixtures/precision/sp599/positive-assignment/client.ts",
+            "source_hex": "6173796e632066756e6374696f6e207265616428726573706f6e736529207b0a2020636f6e7374207061796c6f6164203d20617761697420726573706f6e73652e6a736f6e28293b0a2020636f6e73742076616c7565203d207061796c6f61642e64617461212e76616c75653b0a202072657475726e2076616c75653b0a7d0a",
+            "expected_line": 3,
+            "expected_confidence": "high",
+            "expected_detection": "structural",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "d4cb25a17950bc6c3c2f8c7d"
+          }
+        ],
+        "negative": [
+          {
+            "path": "contract-fixtures/precision/sp599/negative-local-field/client.ts",
+            "source_hex": "66756e6374696f6e20726561642829207b2072657475726e20746869732e726f6f74213b207d0a",
+            "expected": false,
+            "rationale": "The 'local-field' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp599/negative-array-guard/client.ts",
+            "source_hex": "696620286f7074696f6e732e76616c7565732e6c656e677468203e203029207b20636f6e7374205b76616c75655d203d206f7074696f6e732e76616c756573213b207d0a",
+            "expected": false,
+            "rationale": "The 'array-guard' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp599/negative-assertion-only/client.ts",
+            "source_hex": "6173796e632066756e6374696f6e207265616428726573706f6e736529207b0a2020636f6e7374207061796c6f6164203d20617761697420726573706f6e73652e6a736f6e28293b0a202072657475726e207061796c6f61642e64617461213b0a7d0a",
+            "expected": false,
+            "rationale": "The 'assertion-only' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp599/negative-guard/client.ts",
+            "source_hex": "6173796e632066756e6374696f6e207265616428726573706f6e736529207b0a2020636f6e7374207061796c6f6164203d20617761697420726573706f6e73652e6a736f6e28293b0a2020696620287061796c6f61642e64617461203d3d206e756c6c292072657475726e206e756c6c3b0a202072657475726e207061796c6f61642e64617461212e6e616d653b0a7d0a",
+            "expected": false,
+            "rationale": "The 'guard' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp599/negative-schema/client.ts",
+            "source_hex": "6173796e632066756e6374696f6e207265616428726573706f6e736529207b0a2020636f6e7374207061796c6f6164203d20617761697420726573706f6e73652e6a736f6e28293b0a2020636f6e73742076616c696461746564203d20736368656d612e7061727365287061796c6f6164293b0a202072657475726e2076616c6964617465642e64617461212e6e616d653b0a7d0a",
+            "expected": false,
+            "rationale": "The 'schema' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp599/negative-optional/client.ts",
+            "source_hex": "6173796e632066756e6374696f6e207265616428726573706f6e736529207b0a2020636f6e7374207061796c6f6164203d20617761697420726573706f6e73652e6a736f6e28293b0a202072657475726e207061796c6f61642e646174613f2e6e616d653b0a7d0a",
+            "expected": false,
+            "rationale": "The 'optional' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp599/negative-wrong-binding/client.ts",
+            "source_hex": "6173796e632066756e6374696f6e207265616428726573706f6e736529207b0a2020636f6e7374207061796c6f6164203d20617761697420726573706f6e73652e6a736f6e28293b0a202072657475726e20636f6e6669672e64617461212e6e616d653b0a7d0a",
+            "expected": false,
+            "rationale": "The 'wrong-binding' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp599/negative-string/client.ts",
+            "source_hex": "636f6e73742073616d706c65203d20226173796e632066756e6374696f6e207265616428726573706f6e736529207b5c6e2020636f6e7374207061796c6f6164203d20617761697420726573706f6e73652e6a736f6e28293b5c6e202072657475726e207061796c6f61642e64617461212e6e616d653b5c6e7d5c6e223b0a",
+            "expected": false,
+            "rationale": "The 'string' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          }
+        ],
+        "adversarial": [
+          {
+            "path": "contract-fixtures/precision/sp599/adversarial-separate-scope/client.ts",
+            "source_hex": "6173796e632066756e6374696f6e206128726573706f6e736529207b20636f6e7374207061796c6f6164203d20617761697420726573706f6e73652e6a736f6e28293b207d0a66756e6374696f6e2062287061796c6f616429207b2072657475726e207061796c6f61642e64617461212e6e616d653b207d0a",
+            "expected": false,
+            "rationale": "The 'separate-scope' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp599/adversarial-alias-unresolved/client.ts",
+            "source_hex": "6173796e632066756e6374696f6e207265616428726573706f6e736529207b0a2020636f6e7374207061796c6f6164203d20617761697420726573706f6e73652e6a736f6e28293b0a2020636f6e737420616c696173203d207061796c6f61643b0a202072657475726e20616c6961732e64617461212e6e616d653b0a7d0a",
+            "expected": false,
+            "rationale": "The 'alias-unresolved' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          }
+        ]
+      }
+    }
+  ]
+}

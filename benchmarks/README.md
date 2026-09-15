@@ -15,7 +15,7 @@ Hardware, OS, filesystem, Python version, and cold/warm cache state materially a
 
 ## Head-to-head harness (optional, offline)
 
-`benchmarks/head_to_head.py` compares ShipProof with another scanner on identical local corpora, using median end-to-end wall time over N repeats and file-level precision/recall/F1 against a shared label file:
+`benchmarks/head_to_head.py` compares ShipProof with another scanner on identical local corpora, using median end-to-end wall time over N repeats and shared file-level plus line-level labels:
 
 ```bash
 python benchmarks/head_to_head.py fixtures/vulnerable-node-api fixtures/node-taint-crossfile fixtures/node-secure-crossfile --repeat 3
@@ -27,7 +27,7 @@ Fairness rules, enforced by the harness design:
 - Both tools scan the same directories on the same machine, timed from process start to report; no warm-up runs are hidden.
 - ShipProof runs exactly as shipped (`scan_repo.py --format json`), never a cherry-picked rule subset.
 - The other tool runs only with rule files the caller supplies via `--semgrep-config` (repeatable). ShipProof never bundles, downloads, or copies third-party rules — including the comparison scanner's — and the harness performs no network access, per the repository's license and offline guarantees.
-- Scoring is file-level: `benchmarks/head-to-head-labels.json` marks which corpus files contain real issues, and every tool is scored against the same labels. Results describe exactly these corpora, configs, and machine; they are not a general superiority claim, and published comparisons must include the corpora, configs, labels, and environment.
+- Scoring uses `benchmarks/head-to-head-labels.json`: file-level marks which corpus files contain real issues, and line-level marks the expected sink lines. Every tool is scored against the same labels. Line matching is path and line only so a comparison scanner does not need ShipProof rule IDs. Results describe exactly these corpora, configs, and machine; they are not a general superiority claim.
 
 Without `--semgrep-config` (or when the tool is not installed) the harness still reports the ShipProof leg, so it doubles as a repeatable self-benchmark on any repository.
 
@@ -40,7 +40,7 @@ python benchmarks/head_to_head.py fixtures/node-taint-crossfile fixtures/node-se
     --semgrep-config benchmarks/semgrep-comparison/rules.yml --repeat 3
 ```
 
-Latest ShipProof self-leg over all shipped fixture corpora (Windows 11, Python 3.12.10, `--cross-file`, median of 3, 2026-08-24). The v2 label contract separates expected finding locations from context-only chain files:
+Latest ShipProof self-leg over all shipped fixture corpora (Windows 11, Python 3.12.10, `--cross-file`, median of 3, 2026-08-24). The v3 label contract separates expected finding locations and sink lines from context-only chain files:
 
 | Corpus | Findings | TP | FP | FN | TN | Context only | Precision | Recall | F1 |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |

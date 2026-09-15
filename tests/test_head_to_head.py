@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -59,6 +61,72 @@ class LabelLoadingTests(unittest.TestCase):
         self.assertEqual(labels["vulnerable-node-api"]["positive_files"], ["app.js"])
         self.assertEqual(labels["vulnerable-python-api"]["positive_files"], ["app.py"])
         self.assertEqual(labels["secure-node-api"]["positive_files"], [])
+        self.assertEqual(
+            labels["vulnerable-node-api"]["positive_lines"],
+            [
+                {"path": "app.js", "line": 3, "rule_id": "SP103"},
+                {"path": "app.js", "line": 6, "rule_id": "SP104"},
+            ],
+        )
+
+    def test_schema_2_labels_cannot_include_positive_lines(self):
+        with tempfile.TemporaryDirectory() as directory:
+            corpus = Path(directory) / "demo"
+            corpus.mkdir()
+            (corpus / "app.js").write_text("const value = 1;\n", encoding="utf-8")
+            labels_path = Path(directory) / "labels.json"
+            labels_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "corpora": {
+                            "demo": {
+                                "positive_files": ["app.js"],
+                                "context_only_files": [],
+                                "positive_lines": [{"path": "app.js", "line": 1}],
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "schema_version 2"):
+                head_to_head.load_labels(labels_path, [corpus])
+
+    def test_line_metrics_score_path_and_line_without_rule_ids(self):
+        metrics = head_to_head.compute_line_metrics(
+            [{"path": "sink.js", "line": 4, "rule_id": "other.rule"}],
+            [{"path": "sink.js", "line": 4, "rule_id": "SP103"}],
+        )
+        self.assertEqual(metrics["true_positives"], 1)
+        self.assertEqual(metrics["false_positives"], 0)
+        self.assertEqual(metrics["false_negatives"], 0)
+        self.assertEqual(metrics["line_precision"], 1.0)
+        self.assertEqual(metrics["line_recall"], 1.0)
+
+    def test_wrong_line_is_a_line_false_positive_and_false_negative(self):
+        metrics = head_to_head.compute_line_metrics(
+            [{"path": "sink.js", "line": 9}],
+            [{"path": "sink.js", "line": 4}],
+        )
+        self.assertEqual(metrics["true_positives"], 0)
+        self.assertEqual(metrics["false_positives"], 1)
+        self.assertEqual(metrics["false_negatives"], 1)
+        self.assertEqual(metrics["line_precision"], 0.0)
+        self.assertEqual(metrics["line_recall"], 0.0)
+
+    def test_shipproof_leg_hits_labeled_crossfile_sink_lines(self):
+        corpus = ROOT / "fixtures" / "node-taint-crossfile"
+        result = head_to_head.run_shipproof(corpus, repeat=1)
+        labels = head_to_head.load_labels(head_to_head.DEFAULT_LABELS, [corpus])
+        metrics = head_to_head.compute_line_metrics(
+            result["line_hits"],
+            labels["node-taint-crossfile"]["positive_lines"],
+            labels["node-taint-crossfile"]["context_only_files"],
+        )
+        self.assertEqual(metrics["line_precision"], 1.0)
+        self.assertEqual(metrics["line_recall"], 1.0)
+        self.assertGreaterEqual(metrics["true_positives"], 4)
 
     def test_context_only_files_do_not_reduce_sink_location_recall(self):
         metrics = head_to_head.compute_file_metrics(["sink.js"], ["sink.js"], 3, ["source.js"])

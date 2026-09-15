@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "policy": "Extra realistic negatives for precision-plan context gates. These are executed through the full scan path, not the regex-only rule-contract runner.",
+  "rules": [
+    {
+      "rule_id": "SP019",
+      "path": "models.py",
+      "source": "def describe():\n    \"\"\"Example DSN: postgres://app:secret@db.example.test:5432/app.\"\"\"\n    return 1\n"
+    },
+    {
+      "rule_id": "SP101",
+      "path": "cli.py",
+      "source": "def repl(template):\n    return eval(compile(template, '<repl>', 'eval'))\n"
+    },
+    {
+      "rule_id": "SP106",
+      "path": "jinja2/bccache.py",
+      "source": "import pickle\n\ndef load_bytecode(path):\n    with open(path, 'rb') as handle:\n        return pickle.load(handle)\n"
+    },
+    {
+      "rule_id": "SP117",
+      "path": "ajv/compile/index.js",
+      "source": "function compile(schema) {\n  return new Function('data', 'return data');\n}\n"
+    },
+    {
+      "rule_id": "SP140",
+      "path": "sessions.py",
+      "source": "import hashlib\n\ndef session_id(value):\n    return hashlib.sha1(value.encode()).hexdigest()\n"
+    },
+    {
+      "rule_id": "SP307",
+      "path": "routing.py",
+      "source": "import fnmatch\n\ndef match_names(names):\n    for name in names:\n        fnmatch.filter(names, '*.py')\n"
+    },
+    {
+      "rule_id": "SP310",
+      "path": "connection.py",
+      "source": "def drain(sock):\n    while True:\n        data = sock.recv(4096)\n        if not data:\n            break\n"
+    },
+    {
+      "rule_id": "SP505",
+      "path": "termui.py",
+      "source": "def confirm(name):\n    prompt = f'Overwrite {name}?'\n    return input(prompt)\n"
+    },
+    {
+      "rule_id": "SP526",
+      "path": "chat.py",
+      "source": "def append_turn(history, turn):\n    history.append(turn)\n    if len(history) > 20:\n        history = history[-20:]\n    return history\n"
+    },
+    {
+      "rule_id": "SP636",
+      "path": "openapi.py",
+      "source": "schema = {'content': {'text/event-stream': {'schema': {'type': 'string'}}}}\n"
+    },
+    {
+      "rule_id": "SP101",
+      "path": "config.py",
+      "source": "import types\n\ndef from_pyfile(filename):\n    module = types.ModuleType('config')\n    with open(filename, 'rb') as handle:\n        exec(compile(handle.read(), filename, 'exec'), module.__dict__)\n    return module\n"
+    },
+    {
+      "rule_id": "SP101",
+      "path": "debug/console.py",
+      "source": "import code\n\nclass Console(code.InteractiveInterpreter):\n    def runcode(self, compiled):\n        exec(compiled, self.locals)\n"
+    },
+    {
+      "rule_id": "SP636",
+      "path": "routing.py",
+      "source": "from starlette.responses import StreamingResponse\n\nclass APIRouter:\n    def stream(self):\n        return StreamingResponse(body, media_type='text/event-stream')\n"
+    },
+    {
+      "rule_id": "SP367",
+      "path": "lib/read.js",
+      "source": "function contentstream(req) {\n  const stream = createDecompressionStream(encoding);\n  req.pipe(stream);\n  return stream;\n}\n"
+    },
+    {
+      "rule_id": "SP147",
+      "path": "debug/shared/debugger.js",
+      "source": "function render(node, html) {\n  node.innerHTML = html;\n  return node;\n}\n"
+    }
+  ]
+}

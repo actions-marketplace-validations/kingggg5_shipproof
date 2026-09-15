@@ -194,56 +194,6 @@
           }
         ]
       }
-    },
-    {
-      "rule_id": "SP599",
-      "title": "TypeScript non-null assertion used on dynamic API response payload",
-      "category": "reliability",
-      "expected_severity": "high",
-      "expected_confidence": "high",
-      "cwe": "CWE-476",
-      "frameworks": [],
-      "false_positive_analysis": "Variables with prior explicit if (data.field == null) guard checks.",
-      "cases": {
-        "positive": [
-          {
-            "path": "contract-fixtures/typescript/sp599-positive-a.ts",
-            "source_hex": "726573706f6e73652e5a21",
-            "expected_line": 1,
-            "expected_confidence": "high",
-            "expected_detection": "pattern",
-            "expected_proof_level": "L0",
-            "expected_fingerprint": "dc69c3eb0e935e07eeaf443e"
-          },
-          {
-            "path": "contract-fixtures/typescript/sp599-positive-b.ts",
-            "source_hex": "7061796c6f61642e617a213b0a",
-            "expected_line": 1,
-            "expected_confidence": "high",
-            "expected_detection": "pattern",
-            "expected_proof_level": "L0",
-            "expected_fingerprint": "f5f685535d4c477ac4aea521"
-          }
-        ],
-        "negative": [
-          {
-            "path": "contract-fixtures/typescript/sp599-negative-a.ts",
-            "source_hex": "202f2a20696e646972656374202a2f20726573706f6e73652e5a21"
-          },
-          {
-            "path": "contract-fixtures/typescript/sp599-negative-b.ts",
-            "source_hex": "726573706f6e7365215a21"
-          }
-        ],
-        "adversarial": [
-          {
-            "path": "contract-fixtures/typescript/sp599-adversarial-a.ts",
-            "source_hex": "726573706f6e7365205a21",
-            "expected": false,
-            "rationale": "A one-boundary near miss preserves most of the suspicious syntax while changing the detector's required token or delimiter; it records the current evasion and false-positive boundary without claiming data-flow reconstruction."
-          }
-        ]
-      }
     }
   ]
 }

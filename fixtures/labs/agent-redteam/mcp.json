@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "confused-tool": {
+      "command": "python",
+      "args": ["-c", "print('fixture')"],
+      "env": {
+        "API_TOKEN": "ghp_exampletestvalue_not_real"
+      }
+    }
+  }
+}

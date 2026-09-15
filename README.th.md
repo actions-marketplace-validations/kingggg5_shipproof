@@ -147,9 +147,14 @@ catalog ฉบับเต็ม, severity, category และวิธี detec
 
 ShipProof ให้ความสำคัญกับ precision สูงกว่า alert รก:
 
+ตัวอย่างเช่น `SP631` ต้องเห็นการประกาศ Edge runtime จริงพร้อม native runtime import; Node.js ปกติหรือข้อความที่พูดถึง runtime/ledger ไม่ใช่หลักฐานว่าใช้ Edge ดู [ขอบเขตกฎ](docs/rules.md)
+
 - **Inline suppression:** เติม `# shipproof-ignore SP101` หรือ `// shipproof-ignore SP101` บนบรรทัดนั้นหรือบรรทัดก่อนหน้า marker มีผลเฉพาะใน comment เท่านั้น และระบุหลาย rule พร้อมกันได้ เช่น `# shipproof-ignore SP101 SP102`
-- **Confidence filtering:** รันด้วย `--min-confidence high` เพื่อเห็นเฉพาะปัญหา confidence สูง
-- **Reviewed baselines:** บันทึก technical debt เดิมลง `.shipproof-baseline.json` ด้วย `shipproof scan --baseline-out .shipproof-baseline.json`
+- **Confidence filtering:** รันด้วย `--min-confidence high` เพื่อเห็น heuristic findings ที่มี confidence สูง แต่ยังต้องตรวจสอบยืนยัน
+- **หมายเหตุด้านความแม่นยำ:** Finding ของ workflow ขึ้นกับ interpolation ในบริบทการรัน, ไฟล์ environment ต้องตรวจจาก Git index จริง (ไม่ใช่ข้อความใน `.gitignore`), BullMQ ต้องมีการปิด stalled checks อย่างชัดเจน, fetch ต้องเป็นคำขออิสระที่อยู่ติดกันใน component เดียวกัน และ non-null ต้อง dereference จาก JSON; ไม่ได้อ้างความแม่นยำสากล
+- **Reviewed baselines:** สร้าง `.shipproof-baseline.json` ด้วย `shipproof scan --baseline-out .shipproof-baseline.json --baseline-reason "Reviewed migration debt"` แล้วตรวจทานก่อนใช้ `--baseline` การสร้างไฟล์ไม่ใช่การอนุมัติ; reason เริ่มต้นระบุชัดว่ายังต้อง review
+- **การปิด finding ที่ตรวจสอบได้:** Baseline เวอร์ชัน 2 รวม fingerprint ของ finding กับกฎ glob ที่มีเหตุผลประกอบ ดูรายการที่ถูกปิดได้ด้วย `--show-suppressed` ใน JSON, Markdown, terminal หรือ SARIF ซึ่งจะระบุ external suppression ฟิลด์สะกดผิด key ซ้ำ reason ไม่ถูกต้อง หรือ baseline เกินขนาดจะได้ exit `2` ทั้งนี้ fingerprint ไม่ใช่ digest ทั้งไฟล์หรือลายเซ็นอนุมัติ
+- **Coverage ที่ไม่กล่าวอ้างเกินจริง:** ไฟล์/directory ที่อ่านไม่ได้, parser limit, บรรทัด source ยาวเกิน 8,192 ตัวอักษร, source เกินขนาด, symlink/reparse point, binary ที่ไม่รู้จัก และ container ที่ยังไม่ตรวจ ป้องกัน verdict แบบ complete pass; repository scan จะ fail-closed เมื่อ coverage ไม่ครบเป็นค่าเริ่มต้น และยังรับ `--fail-on-incomplete` เพื่อสื่อเจตนาใน command ได้ ส่วน `--allow-incomplete` เป็น exploratory override ที่เห็นชัดเจนเท่านั้น Action และ MCP ก็ strict เป็นค่าเริ่มต้น (ตั้ง boolean เป็น `false` ได้เฉพาะ exploratory run ที่ review แล้ว และ adapter จะแปลงเป็น `--allow-incomplete`) ส่วน `check` จะบังคับ full root, security floor ระดับ high และ fail-closed แม้ policy ใน repository จะพยายามลดระดับหรือจำกัด scope evidence ที่ไม่ครบจะเป็น `CONDITIONAL` แต่ process exit เป็น `1` จึงไม่เปลี่ยนเป็น green gate แบบเงียบ ๆ Coverage นี้หมายถึง source ที่รองรับ ไม่ได้รับรองความปลอดภัยขณะรัน ดู [รายละเอียด contract](docs/commands.md#coverage-and-baseline-contracts)
 
 ## เพิ่ม GitHub Action
 

@@ -55,56 +55,6 @@
       }
     },
     {
-      "rule_id": "SP282",
-      "title": "Ollama model pulled from untrusted registry",
-      "category": "security",
-      "expected_severity": "high",
-      "expected_confidence": "medium",
-      "cwe": "CWE-494",
-      "frameworks": [],
-      "false_positive_analysis": "Legitimate models may be hosted at non-official registries.",
-      "cases": {
-        "positive": [
-          {
-            "path": "contract-fixtures/rust/sp282-positive-a.sh",
-            "source_hex": "6f6c6c616d612072756e202e",
-            "expected_line": 1,
-            "expected_confidence": "medium",
-            "expected_detection": "pattern",
-            "expected_proof_level": "L0",
-            "expected_fingerprint": "44e2d1c775be3e222967815e"
-          },
-          {
-            "path": "contract-fixtures/rust/sp282-positive-b.sh",
-            "source_hex": "6f6c6c616d61092072756e09202d2e3b0a",
-            "expected_line": 1,
-            "expected_confidence": "medium",
-            "expected_detection": "pattern",
-            "expected_proof_level": "L0",
-            "expected_fingerprint": "6e556e3fb3fa016c928853d4"
-          }
-        ],
-        "negative": [
-          {
-            "path": "contract-fixtures/rust/sp282-negative-a.sh",
-            "source_hex": "216c6c616d612072756e202e"
-          },
-          {
-            "path": "contract-fixtures/rust/sp282-negative-b.sh",
-            "source_hex": "206c6c616d612072756e202e"
-          }
-        ],
-        "adversarial": [
-          {
-            "path": "contract-fixtures/rust/sp282-adversarial-a.sh",
-            "source_hex": "586c6c616d612072756e202e",
-            "expected": false,
-            "rationale": "A one-boundary near miss preserves most of the suspicious syntax while changing the detector's required token or delimiter; it records the current evasion and false-positive boundary without claiming data-flow reconstruction."
-          }
-        ]
-      }
-    },
-    {
       "rule_id": "SP283",
       "title": "ComfyUI workflow with untrusted custom node",
       "category": "security",

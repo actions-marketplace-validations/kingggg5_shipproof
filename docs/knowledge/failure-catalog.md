@@ -587,7 +587,7 @@ For building evaluation corpora aligned with the catalog categories. Always re-l
 | [DiverseVul (paper 2304.00409)](https://huggingface.co/papers/2304.00409) | 18,945 vulnerable functions (150 CWEs) + 330k benign, from fix commits in 933 C/C++ projects | Recall corpus for C/C++ rules; CWE diversity |
 | [CIRCL/vulnerability-cwe-patch](https://huggingface.co/datasets/CIRCL/vulnerability-cwe-patch) | Structured real-world vulnerabilities enriched with CWE ids and patch refs | Maps CVE↔CWE↔fix to mine new L0/L1 patterns |
 | [HF Repo2RLEnv cve_patches pipeline](https://github.com/huggingface/Repo2RLEnv/blob/main/docs/pipelines/cve_patches.md) | CVE/GHSA/PYSEC advisories linked to fix commits | Python/JS CVE fix-commit mining (our core languages) |
-| OWASP Benchmark | Java SAST ground-truth suite | Java-adapter evaluation only |
+| OWASP Benchmark | Java SAST ground-truth suite (BenchmarkJava GPL-2.0; BenchmarkPython GPL-3.0) | Do not vendor; Java-adapter evaluation only, outside the package |
 | NIST SARD / Juliet | Multi-language synthetic weaknesses | Coverage smoke tests (language-filtered) |
 | OSV.dev + GitHub GHSA feeds (API) | Live advisories per ecosystem | Continuous regression ingestion |
 

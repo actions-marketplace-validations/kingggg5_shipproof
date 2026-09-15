@@ -160,9 +160,14 @@ The complete catalog, severity, category, and detection method per rule, plus th
 
 ShipProof prioritizes high precision over noisy alerts:
 
+For example, `SP631` requires an explicit Edge runtime declaration plus a native runtime import; ordinary Node.js code and prose mentioning a runtime or ledger are not Edge evidence. See the [rule boundary](docs/rules.md).
+
 - **Inline suppression:** Add `# shipproof-ignore SP101` or `// shipproof-ignore SP101` directly on the line or on the line immediately preceding it. The marker is honored only inside a comment (or at the start of a documentation line), never inside string data, and may list several rules at once (for example `# shipproof-ignore SP101 SP102`). Both the regex and the Python AST engines honor these markers.
-- **Confidence filtering:** Run with `--min-confidence high` to surface only confirmed, high-confidence issues.
-- **Reviewed baselines:** Record existing technical debt into `.shipproof-baseline.json` using `shipproof scan --baseline-out .shipproof-baseline.json`.
+- **Confidence filtering:** Run with `--min-confidence high` to surface high-confidence heuristic findings; these still require verification.
+- **Accuracy note:** Workflow findings depend on run-context interpolation, environment-file findings require a verified Git index (not `.gitignore` text), BullMQ findings require an explicit stalled-check opt-out, fetch findings require adjacent independent requests in the same component, and non-null findings require JSON-source dereference. No universal precision claim is implied.
+- **Reviewed baselines:** Generate `.shipproof-baseline.json` with `shipproof scan --baseline-out .shipproof-baseline.json --baseline-reason "Reviewed migration debt"`, then review it before using `--baseline`. Generation is not approval; the default reason explicitly says review is required.
+- **Auditable suppression:** Baselines (format version 2) combine exact finding fingerprints with reasoned glob rules. `--show-suppressed` reveals them in JSON, Markdown, terminal, or SARIF; SARIF marks them as external suppressions. Unknown fields, duplicate keys, invalid reasons, and oversized baselines fail with exit `2`. Fingerprints are not whole-file digests or signed approvals.
+- **Honest coverage:** Unreadable selected files/directories, parser limits, overlong source lines (over 8,192 characters), oversized source files, symlinks/reparse points, unknown binaries, and uninspected containers prevent a complete-pass verdict. Repository scans fail closed on incomplete coverage by default; the explicit `--fail-on-incomplete` flag remains accepted for readable command intent, while `--allow-incomplete` is an intentionally visible exploratory override. GitHub Action and MCP scan defaults are also strict (set their boolean to `false` only for a reviewed exploratory run; adapters translate that to `--allow-incomplete`). The production `check` command additionally ignores repository attempts to weaken the security floor or narrow scope, scans the full root, and fails closed. Incomplete evidence reports `CONDITIONAL` while the process exits `1`, so no omitted source can silently become a green gate. Coverage describes supported source inspection, not runtime safety. See [coverage and baseline contracts](docs/commands.md#coverage-and-baseline-contracts).
 
 ## Add the GitHub Action
 
@@ -325,7 +330,7 @@ Fixture battery (median of 3 runs, `--cross-file`, labels in [benchmarks/head-to
 | adversarial-node | 1.0 | 1.0 | 1.0 |
 | secure-node-api / node-secure-crossfile |: |: | 0 findings |
 
-The version-2 label contract distinguishes expected finding locations from context-only source/helper files in a vulnerable chain. Those context files remain listed and hashed but do not count as false negatives for a sink-reporting detector. The adversarial corpus holds look-alikes inside comments and string literals that must stay silent, next to disguised chains (two-hop aliasing, destructured parameters, cookie-to-DOM, three-file taint) that must fire.
+The version-3 label contract distinguishes expected finding locations from context-only source/helper files in a vulnerable chain, and records the expected sink lines so line-level accuracy is measurable. Those context files remain listed and hashed but do not count as false negatives for a sink-reporting detector. The adversarial corpus holds look-alikes inside comments and string literals that must stay silent, next to disguised chains (two-hop aliasing, destructured parameters, cookie-to-DOM, three-file taint) that must fire.
 
 The opt-in real-world evaluator pins express, flask, and requests as clean baselines plus juice-shop, DVWA, and NodeGoat as intentionally vulnerable apps. The reviewed 2026-08-24 manifest run scanned 1,805 files and observed 310 application-scope findings (2 / 9 / 3 / 184 / 84 / 28 in that order). Every alert remains explicitly `unreviewed`; these inventory counts are not a real-world precision claim.
 

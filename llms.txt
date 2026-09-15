@@ -13,6 +13,7 @@
 ## What it detects
 
 - 635 deterministic rules across the stable SP001–SP665 namespace (with deliberate gaps) covering secrets, injection, authorization, SSRF, path traversal, Zip-Slip, XXE, XSS, SSTI, ReDoS, unsafe deserialization, open redirect, timing attacks, insecure randomness, temporary files, hardcoded IVs, retry storms, supply chain, unbounded queries/pagination/concurrency, missing timeouts, blocking async calls, memory leaks, payment idempotency, framework misconfiguration, AI/LLM routes, CI gate integrity, and Kubernetes hardening. Findings carry an evidence proof level: L0 pattern, L1 structural/AST/artifact, or L2 interprocedural taint flows promoted by the opt-in --cross-file mode (Python plus JavaScript/TypeScript route-to-sink chains).
+- Scans report `summary.completeness` (scanned/unreadable/parser-limit/line-limit/oversized/container/asset/binary/symlink/excluded/databases); omitted content downgrades the verdict and `scan --fail-on-incomplete` fails the gate. The production `check` command additionally enforces full-root scanning, a high security floor, and fail-closed coverage regardless of repository policy. Baselines (version 2) combine exact fingerprints with human-authored glob rules that require a written reason; suppressed findings are listed via `--show-suppressed` and kept in SARIF as external suppressions.
 - Full rule table with severities: [docs/rules.md](docs/rules.md).
 
 ## Outputs and integrations
@@ -21,6 +22,8 @@
 - GitHub Action (`kingggg5/shipproof`), pre-commit hook, optional read-only MCP server (`shipproof mcp`), Codex/Claude skills (`shipproof init .`).
 
 ## Key facts for agents
+
+- Coverage gates are fail-closed by default for repository scans, the Action, and MCP; explicit `false` on Action/MCP is an exploratory exception that requires review.
 
 - The scan never executes project code. Capacity arithmetic is a hypothesis model, not a load test; replace sample values with measured data.
 - Layer with mature tools instead of replacing them: dedicated SAST/dataflow scanners, OSV-Scanner/Trivy for dependencies, Gitleaks for secret history, k6 for load.

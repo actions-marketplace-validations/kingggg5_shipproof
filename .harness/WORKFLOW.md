@@ -125,6 +125,7 @@ Put detailed bug, performance, scale, security, research, UI, or ShipProof evide
 - Outcome: The full local 0.10.0 release-candidate plan is complete and waiting for human acceptance, not public release approval.
 - Material changes or findings: Eight versioned command snapshots; compatibility validation; complete contracts for all 620 executable rules; bounded optional evidence adapters; deterministic benchmark/evaluation harnesses; a 25-candidate research decision record with 0 unsupported promotions; and a tested CLI 1.0 removal gate.
 - Passed checks: Harness doctor/portability, generated-artifact checks, focused contract tests, full `npm run check`, Node/Python coverage gates, 113-file package smoke, 267-file high-gate self-scan, and clean/adversarial/large-file benchmark budgets.
+- Release-blocker follow-up: repository scan, pre-commit, Action, and MCP coverage gates are strict by default; explicit exploratory opt-out is represented as `--allow-incomplete` and remains outside `check`.
 - Not verified: Production load/soak/DAST/fuzz, human labeling of representative-repository alerts, the hosted multi-runtime CI matrix from this workstation, or independent QA.
 - Residual risks: Three research prototypes remain shadow-only; 310 application findings from the pinned public corpus are explicitly unreviewed; local synthetic benchmarks do not prove production capacity.
 - Human decisions: Accept or request rework; tag, push, and public release remain separate explicit actions.
@@ -156,3 +157,10 @@ Put detailed bug, performance, scale, security, research, UI, or ShipProof evide
 - Duplicate/route evidence: every claimed existing-rule duplicate resolves to a current executable ID; candidates requiring data flow, lifetime, deployment policy, or a different framework route were not approximated with broad regexes.
 - Primary semantics checked: current CWE plus owning Microsoft, PHP, Go, Angular, React, TypeScript, Node/PostgreSQL, and SEI documentation; community sources did not satisfy promotion.
 - External dependency: representative repositories must be revision-pinned and license-reviewed before shadow TP/FP/FN/TN and runtime deltas can be measured. Until then, batch B and all promotions remain closed.
+
+## Release-blocker recheck checkpoint — 2026-09-04
+
+- Trigger: the user supplied an 18-finding security report for the continuing release-readiness review.
+- Result: all reported root causes were either fixed in code or converted into bounded, fail-closed evidence contracts. The final addition is a global 8,192-character source-line budget enforced before regex matching, including direct helper callers, so hostile one-line input cannot turn a scan into an unbounded backtracking workload.
+- Evidence: full `npm run check` passed; direct high-gate scan returned exit 0 with 0 findings across 312 files; the only non-complete status is the intentional `oversized` ledger entry for five research/cache files. Harness doctor and portability checks passed.
+- Acceptance: remains pending human review of the local 0.10.0 candidate. No tag, push, publication, production traffic, DAST, fuzz, or independent QA claim was added.

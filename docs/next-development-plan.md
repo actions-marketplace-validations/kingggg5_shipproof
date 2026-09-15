@@ -1,6 +1,6 @@
 # ShipProof next development plan
 
-Last reviewed: 2026-08-26.
+Last reviewed: 2026-09-04 (P0/P1 recheck; historical benchmark snapshot below is unchanged).
 
 สถานะ: แผนหลักสำหรับเปลี่ยน research backlog ให้เป็น production evidence ที่เชื่อถือได้ โดยไม่เปิดกฎจำนวนมากแบบ big-bang และไม่ลดมาตรฐาน false-positive
 
@@ -14,16 +14,16 @@ ShipProof ต้องรักษาแกนหลักสามข้อพ�
 
 แผนนี้ใช้ร่วมกับ [แผนผู้สมัคร 1,000 รายการ](rule-expansion-1000.md), [ชุดข้อมูลปี 2021–2026](rule-expansion-2021-2026.md) และ [แผนเฉพาะภาษา 5,000 รายการ](rule-expansion-languages-5000.md)
 
-## Baseline ปัจจุบัน
+## Baseline snapshot — 2026-08-27
 
-ข้อมูลต่อไปนี้เป็น snapshot ณ วันที่ทบทวน ไม่ใช่ตัวเลขรับประกันในอนาคต:
+ข้อมูลต่อไปนี้เป็น snapshot วันที่ 2026-08-27 ไม่ใช่ตัวเลขรับประกันในอนาคตหรือผลทดสอบรอบ recheck:
 
 - executable scanner rules: 635
 - research inventory: 7,800 catalogued candidates plus 1,000 reserved promotion slots (`SP651–SP9450`)
 - language-specific research candidates: 5,000 (`SP4451–SP9450`)
-- project Python test cases ที่ discover ได้: 564 พร้อม Node, package และ end-to-end suites
+- project Python test cases ที่ discover ได้: 636 พร้อม Node, package และ end-to-end suites
 - self-scan: 0 active findings ที่ high gate
-- reference benchmark: 1,000 clean files, 3 samples, median 0.7675 วินาที, p95 0.7744 วินาที, peak RSS 28.68 MB บน Windows/Python 3.12.10; fixture/config digest อยู่ใน report
+- reference benchmark: 1,000 clean files, warm pass 0.96 วินาที (~1,040 files/s), peak RSS 26.13 MB บน Windows/Python 3.12.10; harness รายงาน cold และ warm แยกกัน (การเปิดไฟล์ครั้งแรกของ OS ไม่ใช่งาน scanner), รองรับ `--jobs N`, และ fixture/config digest อยู่ใน report
 - default path: read-only, offline และไม่มี dependency เพิ่ม
 
 Candidate ID ไม่ได้แปลว่ามี detector แล้ว จำนวน research slots จึงห้ามนำไปรวมกับ executable rule count ในเอกสารหรือการตลาด
@@ -337,6 +337,113 @@ real-world evaluator มี clean baseline 3 ชุดและ intentionally vu
 ยังเป็น `unreviewed` จนกว่าจะมี human labels จึงห้ามใช้ผลดิบกล่าวอ้าง precision. รอบ reviewed
 manifest วันที่ 2026-08-24 fetch/verify/scan ผ่านครบ 6 revisions รวม 1,805 files, 732 findings
 และ 310 application-scope findings โดยตัวเลขเหล่านี้เป็น inventory ไม่ใช่ precision metric.
+
+## AI extension security track
+
+เป้าหมายของ track นี้คือให้ ShipProof ตรวจ trust boundary รอบ AI agent ได้ดีขึ้น โดยรักษาจุดแข็งเดิม:
+default scan ต้อง local, read-only, offline, deterministic และไม่ต้องติดตั้ง service เพิ่ม. จำนวนหมวด
+หรือจำนวน signature ไม่ใช่ success metric; ทุก claim ต้องไม่เกินหลักฐานที่ scanner มองเห็นจริง.
+
+### Precision boundary ที่ปิดแล้ว
+
+- `SP096`–`SP100` ทำงานเฉพาะ package ที่ประกาศด้วย `SKILL.md`; README ทั่วไปและ directory ชื่อ
+  `skills` ที่ไม่มี descriptor ไม่ถือเป็น Skill package
+- changed-only scan ยังคง ownership context จาก `SKILL.md` แม้ descriptor ไม่ได้อยู่ใน diff
+- `SP099` รายงานการเข้าถึง environment credential เป็น capability evidence ระดับ medium ไม่อ้างว่า
+  มีการขโมยหรือส่งข้อมูลออก
+- `SP100` ต้องเห็น POST-capable client ไปยัง webhook-style endpoint; การเรียก API ของ model provider
+  ตามปกติและ GET webhook ไม่ใช่ finding
+- `SP282` ยอมรับ Ollama bare model, namespace, `library/*` และ default registry; รายงานเฉพาะ host
+  ที่ไม่ใช่ default registry และระบุชัดใน model name
+- กฎ AI framework ปัจจุบันเป็น source-level posture checks ไม่ใช่ CVE scanner และไม่อ้างว่า
+  component ที่ deploy อยู่ตรงกับ vulnerable version
+
+### P0/P1 recheck — 2026-09-04
+
+P0/P1 ในส่วนนี้หมายถึงลำดับงานก่อนปล่อย contract ที่เชื่อถือได้ ไม่ใช่คะแนน CVSS หรือการยืนยันว่า exploit ได้ การตรวจซ้ำพบ implementation ของ completeness/suppression อยู่แล้ว จึงแก้ contract ที่พิสูจน์ว่าผิดก่อนเพิ่ม feature ซ้ำหรือเพิ่มจำนวนกฎ
+
+| Priority | ข้อบกพร่องที่ reproduce ได้ | การแก้และ acceptance |
+| --- | --- | --- |
+| P0 | changed-only นับ omission นอก scope; ZIP ไม่เคารพ exclude; directory error หาย | เลือก scope ก่อนนับ, แยก policy skip, บันทึก walk errors, ทดสอบทั้ง in-scope/out-of-scope |
+| P0 | read limit เช็คเฉพาะก่อนอ่าน; unreadable นับเป็น scanned; fallback นับซ้ำ | bounded descriptor reads, reparse/nonregular guards, UTF-8 omission, reset partial counters, database header only |
+| P0 | trace/SARIF/check และ autofix อาจให้ผลขัดกับ incomplete gate | ส่ง completeness ทุก adapter, check ไม่อ้าง complete pass, Action แสดง warning, MCP คืน gate trace, fix/dry-run ไม่ bypass |
+| P1 | baseline key สะกดผิดหรือ matcher เป็น null ทำให้ suppress กว้างขึ้น; baseline-out โหลดซ้ำไม่ได้ | strict keys/types/duplicate rejection, bounded reasons/counts/bytes, round-trip tests, review-required default reason |
+| P1 | SP631 ตีความ `ledger` เป็น `edge` และแจ้ง Node CLI เป็น critical | ต้องมี literal Edge runtime declaration และ runtime import ใน code; เพิ่ม negative cases สำหรับ Node/comments/strings/type imports |
+
+Scope: implementation เดิม + fixes ข้างต้น; ไม่มี dependency/network default เพิ่ม ไม่มีการ execute SkillSpector หรือคัดลอก detector ของโครงการนั้น Rule IDs/fingerprints เดิมยังคงอยู่ แต่ชื่อและ proof boundary ของ SP631 ถูกแก้ให้ตรงหลักฐาน
+
+หลักฐาน: `tests/test_p0_p1_recheck.py`, `tests/test_coverage_suppression.py`, Node policy/Action/hardening tests, และ MCP SDK handshake ทดสอบ end-to-end การตรวจเป็น self-review พร้อม isolated read-only surface mapping ไม่ใช่ independent security audit การสร้าง symlink จริงขึ้นกับสิทธิ์ OS; มี reparse-point simulation แยกต่างหาก
+
+ผล verification รอบนี้ (Windows, Node 24.15.0, Python 3.12.10):
+
+- `npm run check` ผ่านครบ: Node test suites ผ่านทั้งหมด (skip 1 เคส symlink จริงที่ OS ไม่อนุญาต), Python 684 tests, demo 2 tests, lint, package manifest และ packed-artifact smoke test
+- regression suite ใหม่ 25 tests: ผ่าน 24, skip 1; ตรวจทั้ง positive/negative paths รวม 8 false-positive variants ของ SP631
+- self-scan `--max-file-bytes 10000000 --fail-on high` exit `0`, verdict `PASS_WITH_EVIDENCE`, 369 files, 0 app findings และ 29 test-scope findings; completeness เป็น `true` (assets 10 รายการเป็น intentional boundary) และไม่มี omission reason
+- structural contracts regenerate แล้วและ `--check` ยืนยันว่า current; `git diff --check` ผ่าน
+
+Benchmark แบบ local generated corpus, warm-up 1 pass + 3 measured samples ตาม budget ใน CI (ไม่ใช่ production SLO หรือการเปรียบเทียบกับเครื่องมืออื่น):
+
+| Profile | Files / jobs | Median / p95 (s) | Measured process peak RSS (MB) | Gate |
+| --- | --- | --- | --- | --- |
+| clean throughput | 1,000 / 4 | 0.7519 / 0.7572 | 28.04 | p95 < 15 s |
+| adversarial regex, 4 KiB | 250 / 1 | 2.0974 / 2.1399 | 26.40 | p95 < 5 s; RSS < 256 MB |
+| large file, 512 KiB | 8 / 1 | 7.8642 / 7.9444 | 27.17 | p95 < 10 s; RSS < 256 MB |
+
+ทุก profile ผ่านและมี 0 findings; RSS ของ throughput ไม่ใช่ยอดรวม memory ของทุก worker ยังไม่ได้รัน remote CI matrix ของ Node 20/22 หรือ Python versions/OS อื่นในรอบนี้ และยังไม่ได้ release/commit ผล green gate ไม่ใช่การยืนยันว่าไม่มีบัคหรือ false positive นอก corpus ที่ทดสอบ
+
+### ความปลอดภัยของตัว scanner เอง
+
+- [x] **Inspection completeness ledger:** รายงานเฉพาะ selected source scope; unreadable/parser-limit/line-limit (บรรทัดยาวเกิน 8,192 ตัวอักษร)/oversized/container/unknown-binary/symlink ป้องกัน complete pass ส่วน asset/database เป็น intentional scope boundary; dependency/build trees ยัง prune เพื่อ bounded performance แต่ Git-index และ changed-file selections จะพา tracked files ใน tree นั้นกลับมาตรวจ จึงไม่ซ่อน committed payload หลังชื่อ directory ได้ ส่วน untracked members ยังไม่ enumerate; production `check` บังคับ full-root/high-floor/fail-closed policy ห้ามตีความ zero findings หรือ `is_complete` เป็นความปลอดภัย runtime ดู [contract](commands.md#coverage-and-baseline-contracts)
+- [x] **Auditable suppression (baseline เวอร์ชัน 2):** fingerprint objects และกฎ glob ต้องมี reason; legacy string fingerprints ยังใช้ได้ JSON/Markdown/terminal รองรับ `--show-suppressed` และ SARIF เก็บ external suppressions baseline ไม่ใช่ signed approval หรือ whole-file/content-bound digest; `scanner_version` เป็นข้อมูลและ major-version warning เท่านั้น
+- [x] **Eval-dataset scope:** `evals.json`/`dataset.jsonl` และพี่น้องใต้ `evals/`/`eval/` เป็น test scope โดยอัตโนมัติ — prompt และ ground-truth ไม่ trigger กฎ non-secret แต่ secret ยังถูกรายงาน
+
+Backlog ถัดไป (ปรับลำดับหลัง recheck):
+
+1. **P1 — Capability inventory (AI-A):** opt-in script `scripts/ai_inventory.py` แยก declared / observed-static / unknown และ redact credential แล้ว ยังไม่เป็น blocking rule และยังไม่มี capability graph ครบตาม milestone
+2. **P1 — MCP-config posture + metadata:** explicit mutable/unpinned launch settings เป็น advisory; bidi/hidden instructions ต้องมี field-specific context ภาษาไทย/จีน/ญี่ปุ่นหรือ mixed-script อย่างเดียวไม่ใช่ช่องโหว่ ต้องมี benign multilingual corpus ก่อนเพิ่ม severity
+3. **P2 — Nested artifact inspection:** `--inspect-archives` เปิด ZIP/Office ในหน่วยความจำด้วยขอบเขต member/byte/ratio แล้ว ค่า default ยัง omit container; `.tar`/`.7z` ยังไม่ตรวจ
+4. **P2 — External evidence adapter (AI-B):** `shipproof gate evidence --import` รับ envelope ที่มี version/digest แล้ว exit `2` เมื่อ malformed ไม่เพิ่ม LLM/OSV/network เป็น default
+5. **P2 — Least-privilege/change detection:** หลัง inventory และ trusted digest store มี contract แล้วเท่านั้น ต้องนิยาม reviewer, accepted revision และ stale evidence ก่อนอ้างว่า detect rug pull
+
+เลื่อน candidate เป็น blocking rule ได้เมื่อมี primary sources, positive/negative/adversarial fixtures, deduplication และ human-labelled representative results; ไม่ใช้ rule quota หรือ metric ของ SkillSpector มาอ้าง precision ของ ShipProof
+
+### Milestone AI-A — Inventory และ capability graph
+
+1. เพิ่ม opt-in profile สำหรับค้นหา `SKILL.md`, MCP configuration และ agent-workflow manifests
+2. สร้าง normalized inventory ของ component, declared tools, filesystem/network/process capability,
+   credential access และ remote endpoints โดย redact value ทุกชนิด
+3. แยก `declared`, `observed-static` และ `unknown` ให้ชัด ห้ามตีความ absence of evidence เป็น safe
+4. แสดงเส้นทาง trust boundary เช่น prompt -> tool -> credential -> network sink โดยใช้ proof level
+5. เพิ่ม golden contracts สำหรับ nested package, monorepo, changed-only, Unicode path และ symlink boundary
+
+Acceptance gate:
+
+- inventory เหมือนกันผ่าน Python CLI, Node CLI, MCP และ SARIF adapters
+- default scan ไม่มี network/process execution เพิ่มจาก contract ปัจจุบัน
+- clean representative corpus มี zero observed high/critical false positives
+- finding ทุกตัวอธิบาย observable evidence และ non-claims ได้
+
+### Milestone AI-B — External evidence adapters
+
+1. รับผลจากเครื่องมือภายนอกผ่าน `gate evidence` แบบ opt-in และ schema-versioned
+2. require tool identity, version, config digest, target digest, timestamp และ explicit limitations
+3. normalize severity/control mapping โดยเก็บ original rule ID และ provenance เสมอ
+4. duplicate/correlate กับ ShipProof finding โดยไม่ทำให้ imported claim กลายเป็น native proof
+5. แยก unavailable, timeout, malformed, stale และ incompatible evidence เป็น exit `2`
+
+Adapter ต้องไม่ดาวน์โหลดหรือรันเครื่องมือภายนอกเองใน default path. การรองรับเครื่องมือใดจะเริ่ม
+หลังมี stable public output schema หรือ pinned fixture ที่ตรวจ license และ provenance แล้วเท่านั้น.
+
+### Milestone AI-C — Agent red-team lab
+
+1. ทำเป็น `labs` แบบ explicit opt-in แยกจาก static gate
+2. ใช้ isolated test credentials, deny-by-default tools, bounded requests, timeout และ output caps
+3. เริ่มจาก prompt-injection/tool-confusion fixtures ที่ deterministic ก่อนเพิ่ม model-backed evaluation
+4. model-backed score ต้องรายงาน model/version, seed หรือ repeat policy, sample count และ variance
+5. ห้ามใช้คะแนนชุดเดียวอ้างความปลอดภัยทั่วไป และห้ามส่ง repository source ออกนอกเครื่องโดยปริยาย
+
+Promotion ไปเป็น blocking gate ทำได้เมื่อมี independent labels, reproducible harness, documented
+false-positive/false-negative boundary และผู้ใช้อนุมัติ network/cost/external side effects โดยชัดเจน.
 
 ## CLI 1.0 cleanup
 

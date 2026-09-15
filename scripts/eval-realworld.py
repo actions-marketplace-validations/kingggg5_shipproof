@@ -27,8 +27,10 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "skills" / "audit-production-readiness" / "scripts"))
 
+from finding_labels import index_labels, load_label_records, score_findings  # noqa: E402
 from scan_repo import scan_repository  # noqa: E402
 
 MANIFEST = ROOT / "benchmarks" / "realworld-repositories.json"
@@ -234,6 +236,19 @@ def evaluate(specification: dict[str, str], workspace: Path) -> dict[str, object
         "app_by_severity": dict(sorted(app_by_severity.items())),
         "by_rule": dict(sorted(by_rule.items(), key=lambda item: -item[1])),
         "finding_review_status": "unreviewed",
+        "app_finding_records": [
+            {
+                "rule_id": item.rule_id,
+                "severity": item.severity,
+                "confidence": item.confidence,
+                "proof_level": item.proof_level,
+                "path": item.path,
+                "line": item.line,
+                "fingerprint": item.fingerprint,
+            }
+            for item in findings
+            if item.scope == "app"
+        ][:500],
     }
 
 
@@ -242,6 +257,7 @@ def main() -> int:
     parser.add_argument("--manifest", type=Path, default=MANIFEST)
     parser.add_argument("--only", help="comma-separated reviewed repository names")
     parser.add_argument("--json", action="store_true", help="print raw JSON")
+    parser.add_argument("--labels", action="store_true", help="score reviewed JSONL labels")
     arguments = parser.parse_args()
 
     workspace = ROOT / "benchmarks" / ".work" / "oss-eval"
@@ -286,6 +302,25 @@ def main() -> int:
         "repos": results,
         "unavailable": unavailable,
     }
+    if arguments.labels:
+        try:
+            records = load_label_records(ROOT / "benchmarks" / "labels")
+            labels = index_labels(records)
+            unreviewed = 0
+            for item in results:
+                package_score = score_findings(
+                    list(item.get("app_finding_records") or []),
+                    labels,
+                    corpus="realworld",
+                    package=str(item["repo"]),
+                    revision=str(item["revision"]),
+                )
+                item["labels"] = package_score
+                unreviewed += int(package_score["unreviewed"])
+            payload["label_report"] = {"records": len(records), "unreviewed": unreviewed}
+        except ValueError as exc:
+            print(f"real-world evaluation: invalid labels: {exc}", file=sys.stderr)
+            return 2
     if arguments.json:
         print(json.dumps(payload, indent=2))
         return 2 if unavailable else 0

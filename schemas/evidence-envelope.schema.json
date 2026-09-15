@@ -16,7 +16,7 @@
       },
       "additionalProperties": false
     },
-    "verdict": { "enum": ["PASS", "PASS_WITH_EVIDENCE", "CONDITIONAL", "WARN", "BLOCK"] },
+    "verdict": { "enum": ["PASS", "PASS_WITH_EVIDENCE", "CONDITIONAL", "WARN", "REVIEW", "BLOCK"] },
     "limitations": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 }

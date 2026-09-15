@@ -70,7 +70,9 @@ class CommandContractCompatibilityTests(unittest.TestCase):
                 self.assertEqual(report["tool"]["name"], "ShipProof")
                 self.assertEqual(report["tool"]["version"], package["version"])
                 self.assertEqual(report["tool"]["command"], command.removesuffix("-report"))
-                self.assertIn(report["verdict"], {"PASS_WITH_EVIDENCE", "BLOCK", "CONDITIONAL"})
+                self.assertIn(
+                    report["verdict"], {"PASS_WITH_EVIDENCE", "BLOCK", "CONDITIONAL", "REVIEW"}
+                )
                 self.assertTrue(report["limitations"])
 
 

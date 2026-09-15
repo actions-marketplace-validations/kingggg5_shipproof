@@ -542,7 +542,10 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def load_config(config_path: Path) -> tuple[dict[str, object], object | None]:
-    config_payload = json.loads(config_path.read_text(encoding="utf-8"))
+    try:
+        config_payload = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, RecursionError, MemoryError) as exc:
+        raise ValueError(f"cannot read capacity config: {config_path}") from exc
     if not isinstance(config_payload, dict):
         raise ValueError("config file must contain a JSON object")
 

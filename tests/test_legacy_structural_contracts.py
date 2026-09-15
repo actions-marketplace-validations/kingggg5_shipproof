@@ -20,6 +20,7 @@ from scan_repo import (  # noqa: E402
     deduplicate_and_suppress_findings,
     find_python_ast_issues,
     find_regex_issues,
+    find_tracked_env_issues,
     scan_single_file,
 )
 
@@ -50,11 +51,16 @@ def findings_for(entry: dict[str, Any], case: dict[str, Any]):
             ]
     path = Path(case["path"])
     source = source_for(case)
+    if entry["rule_id"] == "SP220":
+        tracked = {case["path"]} if case.get("tracked_in_git") else set()
+        return find_tracked_env_issues({case["path"]}, tracked)
     findings = find_regex_issues(
         path,
         case["path"],
         source,
-        detected_frameworks=frozenset(entry["frameworks"]),
+        detected_frameworks=frozenset(
+            case["frameworks"] if "frameworks" in case else entry["frameworks"]
+        ),
     )
     if path.suffix.lower() == ".py":
         findings.extend(find_python_ast_issues(case["path"], source))

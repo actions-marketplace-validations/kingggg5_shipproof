@@ -44,6 +44,7 @@ MANUAL_WITNESSES = {
     "SP212": "run: printenv",
     "SP274": "process.env.API_KEY",
     "SP275": 'server.registerTool("run", { inputSchema: z.any() }, handler)',
+    "SP282": "ollama pull models.example.test/team/model:latest",
     "SP332": "go func() { ch <- value // unbuffered\n}()",
     "SP371": "for i, item := range items {\n    go func() { use(item) }\n}",
     "SP592": "const body = (await req.json()) as any",
@@ -361,6 +362,73 @@ def positive_case(rule: Any, ecosystem: str, case_id: str, source: str) -> dict[
 
 
 def contract_entry(rule: Any, ecosystem: str) -> dict[str, Any]:
+    if rule.rule_id == "SP282":
+        positive_sources = (
+            "ollama pull models.example.test/team/model:latest",
+            "ollama run localhost:5000/team/model",
+            "ollama pull registry.ollama.ai:5443/team/model",
+        )
+        positive = [
+            positive_case(rule, ecosystem, f"positive-{'abc'[index]}", source)
+            for index, source in enumerate(positive_sources)
+        ]
+        negative_sources = (
+            "ollama pull gemma4",
+            "ollama run myteam/model:latest",
+            "ollama pull library/llama3.2",
+            "ollama pull registry.ollama.ai/library/gemma4",
+            'echo "ollama pull models.example.test/team/model"',
+        )
+        negative = []
+        for index, source in enumerate(negative_sources):
+            path = case_path(rule, ecosystem, f"negative-{'abcde'[index]}")
+            if active_findings(rule, path, source):
+                raise ValueError(f"{rule.rule_id} curated negative unexpectedly matched: {source}")
+            negative.append({"path": path, **encoded_text(source)})
+        adversarial_specs = (
+            (
+                "ollama pull registry.ollama.ai/library/gemma4",
+                False,
+                "An explicitly written default Ollama registry remains trusted and must not be confused with an external host.",
+            ),
+            (
+                "ollama pull registry.ollama.ai:443/library/gemma4",
+                False,
+                "The explicit standard HTTPS port on Ollama's default registry does not change the registry trust root and must stay silent.",
+            ),
+        )
+        adversarial = []
+        for index, (source, expected, rationale) in enumerate(adversarial_specs):
+            path = case_path(rule, ecosystem, f"adversarial-{'ab'[index]}")
+            detected = bool(active_findings(rule, path, source))
+            if detected is not expected:
+                raise ValueError(
+                    f"{rule.rule_id} curated adversarial mismatch: {source} expected={expected}"
+                )
+            adversarial.append(
+                {
+                    "path": path,
+                    **encoded_text(source),
+                    "expected": expected,
+                    "rationale": rationale,
+                }
+            )
+        return {
+            "rule_id": rule.rule_id,
+            "title": rule.title,
+            "category": rule.category,
+            "expected_severity": rule.severity,
+            "expected_confidence": rule.confidence,
+            "cwe": rule.cwe,
+            "frameworks": sorted(RULE_FRAMEWORK_HINTS.get(rule.rule_id, frozenset())),
+            "false_positive_analysis": RULE_EXPLANATIONS[rule.rule_id]["false_positive"],
+            "cases": {
+                "positive": positive,
+                "negative": negative,
+                "adversarial": adversarial,
+            },
+        }
+
     positive_count = 2 if rule.severity in {"critical", "high"} else 1
     sources: list[str] = []
     for variant in range(positive_count):

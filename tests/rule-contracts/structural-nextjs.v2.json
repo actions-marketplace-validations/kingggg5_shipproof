@@ -145,59 +145,6 @@
       }
     },
     {
-      "rule_id": "SP597",
-      "title": "Next.js Server Component sequential waterfall requests blocking initial SSR",
-      "category": "scale",
-      "expected_severity": "high",
-      "expected_confidence": "high",
-      "cwe": "CWE-400",
-      "frameworks": [
-        "nextjs",
-        "react"
-      ],
-      "false_positive_analysis": "Dependent queries where the second fetch strictly depends on data from the first fetch.",
-      "cases": {
-        "positive": [
-          {
-            "path": "contract-fixtures/nextjs/sp597-positive-a/page.tsx",
-            "source_hex": "6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b0a2020636f6e73742061203d206177616974206665746368282768747470733a2f2f612e696e76616c696427293b0a2020636f6e73742062203d206177616974206665746368282768747470733a2f2f622e696e76616c696427293b0a202072657475726e206e756c6c3b0a7d0a",
-            "expected_line": 2,
-            "expected_confidence": "high",
-            "expected_detection": "structural",
-            "expected_proof_level": "L1",
-            "expected_fingerprint": "38b180c20bef2b7588c19078"
-          },
-          {
-            "path": "contract-fixtures/nextjs/sp597-positive-b/page.tsx",
-            "source_hex": "0a6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b0a2020636f6e73742061203d206177616974206665746368282768747470733a2f2f612e696e76616c696427293b0a2020636f6e73742062203d206177616974206665746368282768747470733a2f2f622e696e76616c696427293b0a202072657475726e206e756c6c3b0a7d0a",
-            "expected_line": 3,
-            "expected_confidence": "high",
-            "expected_detection": "structural",
-            "expected_proof_level": "L1",
-            "expected_fingerprint": "7e0a05a9b18891a9365a47b5"
-          }
-        ],
-        "negative": [
-          {
-            "path": "contract-fixtures/nextjs/sp597-negative_a/page.tsx",
-            "source_hex": "6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b0a2020636f6e7374205b612c20625d203d2061776169742050726f6d6973652e616c6c285b6665746368282768747470733a2f2f612e696e76616c696427292c206665746368282768747470733a2f2f622e696e76616c696427295d293b0a202072657475726e206e756c6c3b0a7d0a"
-          },
-          {
-            "path": "contract-fixtures/nextjs/sp597-negative_b/page.tsx",
-            "source_hex": "6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b0a2020636f6e73742061203d206177616974206665746368282768747470733a2f2f612e696e76616c696427293b0a202072657475726e206e756c6c3b0a7d0a"
-          }
-        ],
-        "adversarial": [
-          {
-            "path": "contract-fixtures/nextjs/sp597-adversarial-a/page.tsx",
-            "source_hex": "636f6e7374206c6f6164203d2066657463683b0a6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b20636f6e73742061203d206177616974206c6f6164282768747470733a2f2f612e696e76616c696427293b20636f6e73742062203d206177616974206c6f6164282768747470733a2f2f622e696e76616c696427293b2072657475726e206e756c6c3b207d0a",
-            "expected": false,
-            "rationale": "The source preserves the risky operation through an alias, computed value, or indirect boundary that the local structural engine intentionally does not resolve; the case records a known evasion without overstating proof."
-          }
-        ]
-      }
-    },
-    {
       "rule_id": "SP598",
       "title": "Next.js mutating route handler using cookie auth without CSRF origin verification",
       "category": "security",
@@ -305,13 +252,13 @@
     },
     {
       "rule_id": "SP631",
-      "title": "Node.js native module imported in Edge or Serverless runtime",
+      "title": "Node.js native module imported with explicit Edge runtime",
       "category": "reliability",
       "expected_severity": "critical",
       "expected_confidence": "high",
       "cwe": "CWE-664",
       "frameworks": [],
-      "false_positive_analysis": "Build-time code or edge runners with explicit polyfill layers.",
+      "false_positive_analysis": "Requires a literal module-level export const runtime = 'edge' and a runtime import, not prose, substring matches, commented imports, or import type. Computed/multiline declarations and ambiguous JSX/template contexts remain unsupported; build-time polyfills still need human review.",
       "cases": {
         "positive": [
           {
@@ -336,7 +283,7 @@
         "negative": [
           {
             "path": "contract-fixtures/nextjs/sp631-negative_a/route.ts",
-            "source_hex": "6578706f727420636f6e73742072756e74696d65203d20276e6f64656a73273b0a696d706f72742066732066726f6d20276e6f64653a6673273b0a"
+            "source_hex": "6578706f727420636f6e73742072756e74696d65203d20276e6f64656a73273b0a696d706f72742066732066726f6d20276e6f64653a6673273b0a2f2f2054686520636f6d706c6574656e657373206c6564676572206973206f7264696e617279204e6f646520636f64652e0a"
           },
           {
             "path": "contract-fixtures/nextjs/sp631-negative_b/route.ts",
@@ -349,6 +296,145 @@
             "source_hex": "6578706f727420636f6e73742072756e74696d65203d205b276564272c20276765275d2e6a6f696e282727293b0a696d706f72742066732066726f6d20276e6f64653a6673273b0a",
             "expected": false,
             "rationale": "The source preserves the risky operation through an alias, computed value, or indirect boundary that the local structural engine intentionally does not resolve; the case records a known evasion without overstating proof."
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "SP597",
+      "title": "Next.js Server Component has adjacent sequential independent fetches",
+      "category": "scale",
+      "expected_severity": "high",
+      "expected_confidence": "high",
+      "cwe": "CWE-400",
+      "frameworks": [
+        "nextjs",
+        "react"
+      ],
+      "false_positive_analysis": "Limited to exported async page/layout components and known Next.js or manifest-unknown context. Separate functions, dependent requests, identical memoized URLs, client components, request options and shadowed fetch are excluded. Ordering requirements, cache behavior and runtime impact still need review; indirect syntax and template interpolation are unresolved.",
+      "cases": {
+        "positive": [
+          {
+            "path": "contract-fixtures/precision/sp597/positive-page/app/page.tsx",
+            "source_hex": "6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b0a2020636f6e73742061203d206177616974206665746368282768747470733a2f2f612e696e76616c696427293b0a2020636f6e73742062203d206177616974206665746368282768747470733a2f2f622e696e76616c696427293b0a202072657475726e206e756c6c3b0a7d0a",
+            "expected_line": 2,
+            "expected_confidence": "high",
+            "expected_detection": "structural",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "9bd5c3dce485e406c60758ed",
+            "frameworks": [
+              "nextjs",
+              "react"
+            ]
+          },
+          {
+            "path": "contract-fixtures/precision/sp597/positive-layout/app/layout.jsx",
+            "source_hex": "6578706f72742064656661756c74206173796e632066756e6374696f6e204c61796f75742829207b0a2020636f6e73742061203d206177616974206665746368282768747470733a2f2f612e696e76616c696427293b0a2020636f6e73742062203d206177616974206665746368282768747470733a2f2f622e696e76616c696427293b0a202072657475726e206e756c6c3b0a7d0a",
+            "expected_line": 2,
+            "expected_confidence": "high",
+            "expected_detection": "structural",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "bb10ec368fa5883f6ae6af51",
+            "frameworks": [
+              "nextjs",
+              "react"
+            ]
+          },
+          {
+            "path": "contract-fixtures/precision/sp597/positive-comments/page.tsx",
+            "source_hex": "6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b0a2020636f6e73742061203d206177616974206665746368282768747470733a2f2f612e696e76616c696427293b0a20202f2f207365706172617465206461746120736f757263650a2020636f6e73742062203d206177616974206665746368282768747470733a2f2f622e696e76616c696427293b0a202072657475726e206e756c6c3b0a7d0a",
+            "expected_line": 2,
+            "expected_confidence": "high",
+            "expected_detection": "structural",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "cca5db3695675e42ed3b323d",
+            "frameworks": [
+              "nextjs",
+              "react"
+            ]
+          }
+        ],
+        "negative": [
+          {
+            "path": "contract-fixtures/precision/sp597/negative-separate-functions/server.ts",
+            "source_hex": "6173796e632066756e6374696f6e20612829207b2072657475726e206177616974206665746368282768747470733a2f2f612e696e76616c696427293b207d0a6173796e632066756e6374696f6e20622829207b2072657475726e206177616974206665746368282768747470733a2f2f622e696e76616c696427293b207d0a",
+            "frameworks": [],
+            "expected": false,
+            "rationale": "The 'separate-functions' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp597/negative-different-framework/app/page.tsx",
+            "source_hex": "6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b0a2020636f6e73742061203d206177616974206665746368282768747470733a2f2f612e696e76616c696427293b0a2020636f6e73742062203d206177616974206665746368282768747470733a2f2f622e696e76616c696427293b0a202072657475726e206e756c6c3b0a7d0a",
+            "frameworks": [
+              "react"
+            ],
+            "expected": false,
+            "rationale": "The 'different-framework' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp597/negative-client/page.tsx",
+            "source_hex": "2775736520636c69656e74273b0a6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b0a2020636f6e73742061203d206177616974206665746368282768747470733a2f2f612e696e76616c696427293b0a2020636f6e73742062203d206177616974206665746368282768747470733a2f2f622e696e76616c696427293b0a202072657475726e206e756c6c3b0a7d0a",
+            "frameworks": [
+              "nextjs"
+            ],
+            "expected": false,
+            "rationale": "The 'client' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp597/negative-dependent/page.tsx",
+            "source_hex": "6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b0a2020636f6e73742061203d206177616974206665746368282768747470733a2f2f612e696e76616c696427293b0a2020636f6e73742062203d20617761697420666574636828612e75726c293b0a202072657475726e206e756c6c3b0a7d0a",
+            "frameworks": [
+              "nextjs"
+            ],
+            "expected": false,
+            "rationale": "The 'dependent' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp597/negative-parallel/page.tsx",
+            "source_hex": "6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b0a2020636f6e7374205b612c20625d203d2061776169742050726f6d6973652e616c6c285b6665746368282768747470733a2f2f612e696e76616c696427292c206665746368282768747470733a2f2f622e696e76616c696427295d293b0a202072657475726e206e756c6c3b0a7d0a",
+            "frameworks": [
+              "nextjs"
+            ],
+            "expected": false,
+            "rationale": "The 'parallel' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp597/negative-identical-memoized/page.tsx",
+            "source_hex": "6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b0a2020636f6e73742061203d206177616974206665746368282768747470733a2f2f612e696e76616c696427293b0a2020636f6e73742062203d206177616974206665746368282768747470733a2f2f612e696e76616c696427293b0a202072657475726e206e756c6c3b0a7d0a",
+            "frameworks": [
+              "nextjs"
+            ],
+            "expected": false,
+            "rationale": "The 'identical-memoized' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp597/negative-post-side-effects/page.tsx",
+            "source_hex": "6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b0a2020636f6e73742061203d206177616974206665746368282768747470733a2f2f612e696e76616c6964272c207b6d6574686f643a2027504f5354277d293b0a2020636f6e73742062203d206177616974206665746368282768747470733a2f2f622e696e76616c696427293b0a202072657475726e206e756c6c3b0a7d0a",
+            "frameworks": [
+              "nextjs"
+            ],
+            "expected": false,
+            "rationale": "The 'post-side-effects' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          }
+        ],
+        "adversarial": [
+          {
+            "path": "contract-fixtures/precision/sp597/adversarial-nested-functions/page.tsx",
+            "source_hex": "6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b0a20206173796e632066756e6374696f6e20612829207b2072657475726e206177616974206665746368282768747470733a2f2f612e696e76616c696427293b207d0a20206173796e632066756e6374696f6e20622829207b2072657475726e206177616974206665746368282768747470733a2f2f622e696e76616c696427293b207d0a202072657475726e206e756c6c3b0a7d0a",
+            "frameworks": [
+              "nextjs"
+            ],
+            "expected": false,
+            "rationale": "The 'nested-functions' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp597/adversarial-shadowed-fetch/page.tsx",
+            "source_hex": "696d706f7274207b206665746368207d2066726f6d20272e2f6c6f63616c273b0a6578706f72742064656661756c74206173796e632066756e6374696f6e20506167652829207b0a2020636f6e73742061203d206177616974206665746368282768747470733a2f2f612e696e76616c696427293b0a2020636f6e73742062203d206177616974206665746368282768747470733a2f2f622e696e76616c696427293b0a202072657475726e206e756c6c3b0a7d0a",
+            "frameworks": [
+              "nextjs"
+            ],
+            "expected": false,
+            "rationale": "The 'shadowed-fetch' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
           }
         ]
       }

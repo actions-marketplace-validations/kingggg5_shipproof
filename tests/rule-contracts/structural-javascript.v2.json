@@ -53,6 +53,120 @@
           }
         ]
       }
+    },
+    {
+      "rule_id": "SP583",
+      "title": "BullMQ worker explicitly disables stalled checks",
+      "category": "reliability",
+      "expected_severity": "medium",
+      "expected_confidence": "high",
+      "cwe": "CWE-703",
+      "frameworks": [],
+      "false_positive_analysis": "Requires a visible BullMQ Worker import/require and a literal opt-out in constructor options. Default options, Node workers, shadowed bindings and unknown spreads stay silent. A dedicated external checker can make the opt-out intentional; templates with interpolation and indirect options are unresolved.",
+      "cases": {
+        "positive": [
+          {
+            "path": "contract-fixtures/precision/sp583/positive-named/worker.ts",
+            "source_hex": "696d706f7274207b20576f726b6572207d2066726f6d202762756c6c6d71273b0a636f6e737420776f726b6572203d206e657720576f726b657228277175657565272c2070726f636573734a6f622c207b20736b69705374616c6c6564436865636b3a2074727565207d293b0a",
+            "expected_line": 2,
+            "expected_confidence": "high",
+            "expected_detection": "structural",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "01bc2b304e5fc2968a393f74"
+          },
+          {
+            "path": "contract-fixtures/precision/sp583/positive-alias/worker.ts",
+            "source_hex": "696d706f7274207b20576f726b6572206173205175657565576f726b6572207d2066726f6d202762756c6c6d71273b0a636f6e737420776f726b6572203d206e6577205175657565576f726b657228277175657565272c2070726f636573734a6f622c207b20736b69705374616c6c6564436865636b3a2074727565207d293b0a",
+            "expected_line": 2,
+            "expected_confidence": "high",
+            "expected_detection": "structural",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "24a54d4e0a3f7957a6402e61"
+          },
+          {
+            "path": "contract-fixtures/precision/sp583/positive-require/worker.ts",
+            "source_hex": "636f6e7374207b20576f726b65723a205175657565576f726b6572207d203d2072657175697265282762756c6c6d7127293b0a636f6e737420776f726b6572203d206e6577205175657565576f726b657228277175657565272c2070726f636573734a6f622c207b20736b69705374616c6c6564436865636b3a2074727565207d293b0a",
+            "expected_line": 2,
+            "expected_confidence": "high",
+            "expected_detection": "structural",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "7313dd5930b62988a5785766"
+          },
+          {
+            "path": "contract-fixtures/precision/sp583/positive-namespace/worker.ts",
+            "source_hex": "696d706f7274202a2061732051756575652066726f6d202762756c6c6d71273b0a636f6e737420776f726b6572203d206e65772051756575652e576f726b657228277175657565272c2070726f636573734a6f622c207b20736b69705374616c6c6564436865636b3a2074727565207d293b0a",
+            "expected_line": 2,
+            "expected_confidence": "high",
+            "expected_detection": "structural",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "f2ad00ad4acc75487d8fe177"
+          }
+        ],
+        "negative": [
+          {
+            "path": "contract-fixtures/precision/sp583/negative-node-worker/worker.ts",
+            "source_hex": "696d706f7274207b20576f726b6572207d2066726f6d20276e6f64653a776f726b65725f74687265616473273b0a636f6e737420776f726b6572203d206e657720576f726b657228277175657565272c2070726f636573734a6f622c207b20736b69705374616c6c6564436865636b3a2074727565207d293b0a",
+            "expected": false,
+            "rationale": "The 'node-worker' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp583/negative-default/worker.ts",
+            "source_hex": "696d706f7274207b20576f726b6572207d2066726f6d202762756c6c6d71273b0a636f6e737420776f726b6572203d206e657720576f726b657228277175657565272c2070726f636573734a6f622c207b20636f6e6e656374696f6e207d293b0a",
+            "expected": false,
+            "rationale": "The 'default' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp583/negative-explicit-enabled/worker.ts",
+            "source_hex": "696d706f7274207b20576f726b6572207d2066726f6d202762756c6c6d71273b0a636f6e737420776f726b6572203d206e657720576f726b657228277175657565272c2070726f636573734a6f622c207b20736b69705374616c6c6564436865636b3a2066616c7365207d293b0a",
+            "expected": false,
+            "rationale": "The 'explicit-enabled' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp583/negative-type-import/worker.ts",
+            "source_hex": "696d706f72742074797065207b20576f726b6572207d2066726f6d202762756c6c6d71273b0a636f6e737420776f726b6572203d206e657720576f726b657228277175657565272c2070726f636573734a6f622c207b20736b69705374616c6c6564436865636b3a2074727565207d293b0a",
+            "expected": false,
+            "rationale": "The 'type-import' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp583/negative-comment/worker.ts",
+            "source_hex": "2f2a20696d706f7274207b20576f726b6572207d2066726f6d202762756c6c6d71273b0a636f6e737420776f726b6572203d206e657720576f726b657228277175657565272c2070726f636573734a6f622c207b20736b69705374616c6c6564436865636b3a2074727565207d293b0a202a2f",
+            "expected": false,
+            "rationale": "The 'comment' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp583/negative-same-name/worker.ts",
+            "source_hex": "636c61737320576f726b6572207b7d0a636f6e737420776f726b6572203d206e657720576f726b657228277175657565272c2070726f636573734a6f622c207b20736b69705374616c6c6564436865636b3a2074727565207d293b0a",
+            "expected": false,
+            "rationale": "The 'same-name' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp583/negative-nested-option/worker.ts",
+            "source_hex": "696d706f7274207b20576f726b6572207d2066726f6d202762756c6c6d71273b0a636f6e737420776f726b6572203d206e657720576f726b657228277175657565272c2070726f636573734a6f622c207b206d657461646174613a207b20736b69705374616c6c6564436865636b3a2074727565207d207d293b0a",
+            "expected": false,
+            "rationale": "The 'nested-option' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp583/negative-overridden/worker.ts",
+            "source_hex": "696d706f7274207b20576f726b6572207d2066726f6d202762756c6c6d71273b0a636f6e737420776f726b6572203d206e657720576f726b657228277175657565272c2070726f636573734a6f622c207b20736b69705374616c6c6564436865636b3a20747275652c20736b69705374616c6c6564436865636b3a2066616c7365207d293b0a",
+            "expected": false,
+            "rationale": "The 'overridden' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          }
+        ],
+        "adversarial": [
+          {
+            "path": "contract-fixtures/precision/sp583/adversarial-shadowed/worker.ts",
+            "source_hex": "696d706f7274207b20576f726b6572207d2066726f6d202762756c6c6d71273b0a66756e6374696f6e20626f6f7428576f726b657229207b2072657475726e206e657720576f726b6572282771272c2070726f636573736f722c207b20736b69705374616c6c6564436865636b3a2074727565207d293b207d0a",
+            "expected": false,
+            "rationale": "The 'shadowed' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp583/adversarial-unknown-spread/worker.ts",
+            "source_hex": "696d706f7274207b20576f726b6572207d2066726f6d202762756c6c6d71273b0a636f6e737420776f726b6572203d206e657720576f726b657228277175657565272c2070726f636573734a6f622c207b20736b69705374616c6c6564436865636b3a20747275652c202e2e2e6f7074696f6e73207d293b0a",
+            "expected": false,
+            "rationale": "The 'unknown-spread' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          }
+        ]
+      }
     }
   ]
 }

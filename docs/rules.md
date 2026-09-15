@@ -6,6 +6,8 @@ Every finding carries an evidence `proof_level`: `L0` means a pattern match, `L1
 
 Run `shipproof explain SP108` for why a rule exists, its attack scenario, false-positive boundary, and regression-test guidance.
 
+`SP631` requires an explicit literal Edge runtime declaration and a native runtime import. It does not classify ordinary Node.js serverless code, comments, quoted examples, or type-only imports as Edge execution. Its boundary follows the official [runtime configuration](https://github.com/vercel/next.js/blob/canary/docs/01-app/03-api-reference/03-file-conventions/02-route-segment-config/runtime.mdx) and [Edge API limitations](https://github.com/vercel/next.js/blob/canary/docs/01-app/03-api-reference/07-edge.mdx), checked through Context7 on 2026-09-04. This local structural check does not resolve computed/multiline declarations, ambiguous JSX/template contexts, build-time polyfills, or deployment settings.
+
 ## Ecosystem-aware detection
 
 ShipProof uses file suffixes, manifests, and bounded structural context to select applicable checks. Framework detection narrows where a rule runs; it is not proof that a framework is configured or deployed exactly as the repository suggests.
@@ -129,8 +131,8 @@ ShipProof uses file suffixes, manifests, and bounded structural context to selec
 | **`SP096`** | CRITICAL | Security | Skill file with instruction injection pattern | Regex |
 | **`SP097`** | CRITICAL | Security | Skill file downloads and executes remote code | Regex |
 | **`SP098`** | HIGH | Security | Skill file with shell execution capability | Regex |
-| **`SP099`** | CRITICAL | Security | Skill file with credential harvesting pattern | Regex |
-| **`SP100`** | HIGH | Security | Skill file with network exfiltration pattern | Regex |
+| **`SP099`** | MEDIUM | Security | Skill accesses high-value environment credential | Regex |
+| **`SP100`** | MEDIUM | Security | Skill posts data to webhook endpoint | Regex |
 | **`SP101`** | HIGH | Security | Dynamic code execution | Python AST |
 | **`SP102`** | HIGH | Security | Shell execution enabled | Python AST |
 | **`SP103`** | HIGH | Security | SQL built with interpolation | Python AST |
@@ -240,7 +242,7 @@ ShipProof uses file suffixes, manifests, and bounded structural context to selec
 | **`SP207`** | HIGH | Security | Dockerfile copying sensitive environment files | Regex |
 | **`SP208`** | LOW | Security | Dockerfile exposing privileged ports | Regex |
 | **`SP209`** | HIGH | Supply-chain | GitHub Actions pull_request_target checkout of PR head | Regex |
-| **`SP210`** | HIGH | Security | GitHub Actions workflow script injection | Regex |
+| **`SP210`** | HIGH | Security | GitHub Actions workflow script injection | Structural |
 | **`SP211`** | MEDIUM | Security | GitHub Actions workflow missing explicit permissions | Regex |
 | **`SP212`** | HIGH | Security | CI/CD step printing environment variables to console | Regex |
 | **`SP213`** | HIGH | Supply-chain | npm script with unsafe-perm | Regex |
@@ -250,7 +252,7 @@ ShipProof uses file suffixes, manifests, and bounded structural context to selec
 | **`SP217`** | HIGH | Security | Kubernetes pod configured with privileged mode | Regex |
 | **`SP218`** | MEDIUM | Reliability | Kubernetes container missing resource limits | Regex |
 | **`SP219`** | HIGH | Security | Kubernetes service exposing unauthenticated NodePort | Regex |
-| **`SP220`** | HIGH | Security | Sensitive environment file tracked in git | Regex |
+| **`SP220`** | HIGH | Security | Sensitive environment file tracked in git | Artifact |
 | **`SP221`** | MEDIUM | Supply-chain | Unpinned git dependency in package manifest | Regex |
 | **`SP222`** | CRITICAL | Security | Docker Compose mounting Docker socket | Regex |
 | **`SP223`** | HIGH | Security | Nginx configuration with deprecated SSL/TLS protocols | Regex |
@@ -307,7 +309,7 @@ ShipProof uses file suffixes, manifests, and bounded structural context to selec
 | **`SP274`** | CRITICAL | Security | MCP tool accessing environment credentials | Regex |
 | **`SP275`** | MEDIUM | Security | MCP tool accepts an unbounded input schema | Regex |
 | **`SP281`** | HIGH | Security | Ollama API endpoint exposed without authentication | Regex |
-| **`SP282`** | HIGH | Security | Ollama model pulled from untrusted registry | Regex |
+| **`SP282`** | HIGH | Security | Ollama model uses explicit non-default registry | Regex |
 | **`SP283`** | HIGH | Security | ComfyUI workflow with untrusted custom node | Regex |
 | **`SP284`** | HIGH | Security | vLLM API endpoint exposed without authentication | Regex |
 | **`SP285`** | HIGH | Security | vLLM model loaded from untrusted source | Regex |
@@ -583,7 +585,7 @@ ShipProof uses file suffixes, manifests, and bounded structural context to selec
 | **`SP580`** | MEDIUM | Security | OpenTelemetry trace baggage headers forwarded without sanitization | Regex |
 | **`SP581`** | CRITICAL | Reliability | Redis distributed lock released without verifying lock token ownership | Regex |
 | **`SP582`** | CRITICAL | Reliability | Redis distributed lock acquired without TTL expiration timeout | Regex |
-| **`SP583`** | MEDIUM | Reliability | BullMQ job worker instantiated without stalledInterval configuration | Regex |
+| **`SP583`** | MEDIUM | Reliability | BullMQ worker explicitly disables stalled checks | Structural |
 | **`SP584`** | HIGH | Reliability | Temporal workflow activity called without start_to_close_timeout | Regex |
 | **`SP585`** | CRITICAL | Correctness | Temporal workflow mutating static or global variables | Regex |
 | **`SP586`** | CRITICAL | Correctness | Temporal workflow calling non-deterministic sleep or system clock | Regex |
@@ -597,9 +599,9 @@ ShipProof uses file suffixes, manifests, and bounded structural context to selec
 | **`SP594`** | HIGH | Security | Authenticated user-specific API call configured with static force-cache | Regex |
 | **`SP595`** | MEDIUM | Reliability | Next.js Server Action database mutation without cache revalidation | Regex |
 | **`SP596`** | HIGH | Correctness | Client-only React hook used inside Server Component without use client | Regex |
-| **`SP597`** | HIGH | Scale | Next.js Server Component sequential waterfall requests blocking initial SSR | Regex |
+| **`SP597`** | HIGH | Scale | Next.js Server Component has adjacent sequential independent fetches | Structural |
 | **`SP598`** | CRITICAL | Security | Next.js mutating route handler using cookie auth without CSRF origin verification | Regex |
-| **`SP599`** | HIGH | Reliability | TypeScript non-null assertion used on dynamic API response payload | Regex |
+| **`SP599`** | HIGH | Reliability | Unchecked JSON field is dereferenced through a TypeScript non-null assertion | Structural |
 | **`SP600`** | CRITICAL | Security | Next.js Server Action accepting unverified userId argument for database mutation | Regex |
 | **`SP601`** | CRITICAL | Security | LLM output dynamically evaluated in code or shell interpreter | Regex |
 | **`SP602`** | HIGH | Security | Direct rendering of raw LLM completion string into raw HTML | Regex |
@@ -631,7 +633,7 @@ ShipProof uses file suffixes, manifests, and bounded structural context to selec
 | **`SP628`** | CRITICAL | Security | Security group ingress rule allowing 0.0.0.0/0 on administrative ports | Regex |
 | **`SP629`** | CRITICAL | Security | IAM policy granting wildcard actions or resources | Regex |
 | **`SP630`** | HIGH | Security | CloudFront distribution or ALB listener allowing unencrypted HTTP | Regex |
-| **`SP631`** | CRITICAL | Reliability | Node.js native module imported in Edge or Serverless runtime | Regex |
+| **`SP631`** | CRITICAL | Reliability | Node.js native module imported with explicit Edge runtime | Structural |
 | **`SP632`** | HIGH | Scale | Unbounded edge fetch loop against Cloudflare KV or database | Regex |
 | **`SP633`** | MEDIUM | Scale | Edge Worker accumulating full response payload in memory instead of streaming | Regex |
 | **`SP634`** | HIGH | Security | Dynamic authenticated API response cached on edge CDN | Regex |

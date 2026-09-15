@@ -7,6 +7,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -84,6 +85,64 @@ test("MCP repository paths reject traversal and symlink-independent outside path
   }
 });
 
+test("Action coverage gate rejects coercion and is strict by default", () => {
+  const root = mkdtempSync(join(tmpdir(), "shipproof-action-coverage-"));
+  try {
+    for (const enabled of [undefined, "false", "true"]) {
+      const inputs = validateActionInputs({ GITHUB_WORKSPACE: root, SHIPPROOF_INPUT_FAIL_ON_INCOMPLETE: enabled });
+      assert.equal(inputs.failOnIncomplete, enabled !== "false");
+      assert.equal(buildScannerArguments(inputs).includes("--fail-on-incomplete"), enabled !== "false");
+      assert.equal(buildScannerArguments(inputs).includes("--allow-incomplete"), enabled === "false");
+    }
+    for (const invalid of ["False", "yes", "1", "true\n", "", true]) {
+      assert.throws(
+        () => validateActionInputs({ GITHUB_WORKSPACE: root, SHIPPROOF_INPUT_FAIL_ON_INCOMPLETE: invalid }),
+        /fail-on-incomplete must be true or false/,
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Action rejects a dangling output symlink before the scanner can write", (context) => {
+  const root = mkdtempSync(join(tmpdir(), "shipproof-action-symlink-"));
+  try {
+    const output = join(root, "shipproof.sarif");
+    try {
+      symlinkSync(join(root, "outside-target.sarif"), output);
+    } catch (error) {
+      context.skip(`symlink creation unavailable: ${error.code || error.message}`);
+      return;
+    }
+    assert.throws(
+      () => validateActionInputs({ GITHUB_WORKSPACE: root }),
+      /output path is not a file/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Action retains fresh incomplete SARIF and fails when coverage is required", async () => {
+  const { main: runActionMain } = await import("../../scripts/run-action.mjs");
+  const root = mkdtempSync(join(tmpdir(), "shipproof-action-incomplete-"));
+  try {
+    writeFileSync(join(root, "bundle.zip"), "uninspected container", "utf8");
+    const exitCode = runActionMain({
+      GITHUB_WORKSPACE: root,
+      SHIPPROOF_INPUT_FAIL_ON: "none",
+      SHIPPROOF_INPUT_FAIL_ON_INCOMPLETE: "true",
+    });
+    assert.equal(exitCode, 1);
+    const report = JSON.parse(readFileSync(join(root, "shipproof.sarif"), "utf8"));
+    assert.equal(report.runs[0].properties.completeness.is_complete, false);
+    assert.equal(report.runs[0].invocations[0].executionSuccessful, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("MCP command construction is allowlisted", () => {
   assert.match(buildPythonInvocation("scan", [".", "--format", "json"])[0], /scan_repo\.py$/);
   assert.throws(() => buildPythonInvocation("shell", ["whoami"]), /unsupported/);
@@ -142,6 +201,10 @@ test("evidence adapters are marker-driven and fixed", () => {
     assert.equal(approvedTypescript.analyzer_version, "Version 5.9.2");
     assert.equal(existsSync(probeMarker), true);
     assert.equal(adapters.find((adapter) => adapter.name === "typescript").requires_project_code_approval, true);
+    const unapprovedRust = adapters.find((adapter) => adapter.name === "rust");
+    assert.equal(unapprovedRust.approval_required, true);
+    assert.equal(unapprovedRust.analyzer_version, null);
+    assert.equal(unapprovedRust.available, false);
     assert.throws(() => runEvidenceAdapter(root, "typescript"), /allow-project-code/);
     const evidenceReport = runEvidenceAdapter(root, "typescript", { allowProjectCode: true });
     assert.equal(evidenceReport.verdict, "PASS_WITH_EVIDENCE");
@@ -394,6 +457,35 @@ test("release metadata rejects branches and accepts only the exact package tag",
     });
     assert.equal(tag.status, 0, tag.stderr);
     assert.ok(readFileSync(outputPath, "utf8").includes(`version=${VERSION}\n`));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("gate evidence import keeps original rule ids and rejects ShipProof identity", () => {
+  const envelope = join(process.cwd(), "fixtures", "external-evidence", "valid-envelope.json");
+  const report = evidenceInternals.loadImportedEvidence(envelope);
+  assert.equal(report.imported_tool.name, "example-linter");
+  assert.equal(report.findings[0].original_rule_id, "EX-001");
+  assert.equal(report.findings[0].imported, true);
+  assert.equal(report.findings[0].proof_level, "external");
+  assert.match(report.findings[0].message, /\[REDACTED\]/);
+  const root = mkdtempSync(join(tmpdir(), "shipproof-import-"));
+  try {
+    const bad = join(root, "bad.json");
+    writeFileSync(
+      bad,
+      JSON.stringify({
+        schema_version: "1.0",
+        tool: { name: "ShipProof", version: "1.2.3", command: "lint" },
+        verdict: "PASS",
+        limitations: ["no"],
+        target_digest: "a".repeat(64),
+        config_digest: "b".repeat(64),
+        captured_at: "2026-09-15T00:00:00Z",
+      }),
+    );
+    assert.throws(() => evidenceInternals.loadImportedEvidence(bad), /ShipProof tool identity/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

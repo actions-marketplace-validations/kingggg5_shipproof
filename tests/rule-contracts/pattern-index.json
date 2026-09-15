@@ -7,8 +7,8 @@
       "path": "pattern-common.v2.json",
       "engine": "pattern",
       "ecosystem": "common",
-      "rule_count": 265,
-      "sha256": "7533efdce669449ae956a61bcbf9fec4d12af829988c31ce841a193eaacfedf6"
+      "rule_count": 264,
+      "sha256": "a82a4afa61b43567794a131e4cfb23fd18ac54e633ec9753a315681fba5146d6"
     },
     {
       "path": "pattern-container.v2.json",
@@ -49,8 +49,8 @@
       "path": "pattern-infrastructure.v2.json",
       "engine": "pattern",
       "ecosystem": "infrastructure",
-      "rule_count": 60,
-      "sha256": "9c0688c7cf961097242ef3dceba5f3c1b5ce186c799f060da8dcaf0949eb2aa5"
+      "rule_count": 59,
+      "sha256": "6c0a36d0e335aa3f9c02ef58ed2209a56c88a8721099c149c9270951a365cec1"
     },
     {
       "path": "pattern-java.v2.json",
@@ -91,8 +91,8 @@
       "path": "pattern-rust.v2.json",
       "engine": "pattern",
       "ecosystem": "rust",
-      "rule_count": 14,
-      "sha256": "f6ff5c8a4379699eb9a7e8d55c3f8cd0da04216ff9b5f445b7db34e66d5b55ea"
+      "rule_count": 13,
+      "sha256": "c660ac9a5bea5cc5bd58b877a9d67c618411142ae657ddfd81e342259ef64fe3"
     },
     {
       "path": "pattern-sql.v2.json",
@@ -105,8 +105,8 @@
       "path": "pattern-typescript.v2.json",
       "engine": "pattern",
       "ecosystem": "typescript",
-      "rule_count": 5,
-      "sha256": "464518f2952b617d6a4205d469f97b117d508a675fd8813ea063591129620316"
+      "rule_count": 4,
+      "sha256": "fc48ee6053c3b4c2abbdc7ac0a91697aa52daa872073dd7bc7a7a2667c497bbf"
     }
   ]
 }

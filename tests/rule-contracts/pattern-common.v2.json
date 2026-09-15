@@ -3352,56 +3352,6 @@
       }
     },
     {
-      "rule_id": "SP220",
-      "title": "Sensitive environment file tracked in git",
-      "category": "security",
-      "expected_severity": "high",
-      "expected_confidence": "high",
-      "cwe": "CWE-798",
-      "frameworks": [],
-      "false_positive_analysis": "Example template files such as .env.example containing placeholder values.",
-      "cases": {
-        "positive": [
-          {
-            "path": "contract-fixtures/common/sp220-positive-a.py",
-            "source_hex": "2e656e762e70726f64756374696f6e",
-            "expected_line": 1,
-            "expected_confidence": "high",
-            "expected_detection": "pattern",
-            "expected_proof_level": "L0",
-            "expected_fingerprint": "d3abc41693b11bfb2d577c6d"
-          },
-          {
-            "path": "contract-fixtures/common/sp220-positive-b.py",
-            "source_hex": "2e656e762e70726f64756374696f6e",
-            "expected_line": 1,
-            "expected_confidence": "high",
-            "expected_detection": "pattern",
-            "expected_proof_level": "L0",
-            "expected_fingerprint": "19fbe161b774a9fb2ec7b8db"
-          }
-        ],
-        "negative": [
-          {
-            "path": "contract-fixtures/common/sp220-negative-a.py",
-            "source_hex": "21656e762e70726f64756374696f6e"
-          },
-          {
-            "path": "contract-fixtures/common/sp220-negative-b.py",
-            "source_hex": "20656e762e70726f64756374696f6e"
-          }
-        ],
-        "adversarial": [
-          {
-            "path": "contract-fixtures/common/sp220-adversarial-a.py",
-            "source_hex": "58656e762e70726f64756374696f6e",
-            "expected": false,
-            "rationale": "A one-boundary near miss preserves most of the suspicious syntax while changing the detector's required token or delimiter; it records the current evasion and false-positive boundary without claiming data-flow reconstruction."
-          }
-        ]
-      }
-    },
-    {
       "rule_id": "SP221",
       "title": "Unpinned git dependency in package manifest",
       "category": "supply-chain",
@@ -3943,6 +3893,83 @@
             "source_hex": "584c4c414d415f484f5354093a09222a22",
             "expected": false,
             "rationale": "A one-boundary near miss preserves most of the suspicious syntax while changing the detector's required token or delimiter; it records the current evasion and false-positive boundary without claiming data-flow reconstruction."
+          }
+        ]
+      }
+    },
+    {
+      "rule_id": "SP282",
+      "title": "Ollama model uses explicit non-default registry",
+      "category": "security",
+      "expected_severity": "high",
+      "expected_confidence": "medium",
+      "cwe": "CWE-494",
+      "frameworks": [],
+      "false_positive_analysis": "Private registries can be legitimate. Bare names such as gemma4 and namespace names such as myteam/model stay silent because Ollama resolves them through its default registry; only an explicit non-default host is reported.",
+      "cases": {
+        "positive": [
+          {
+            "path": "contract-fixtures/common/sp282-positive-a.sh",
+            "source_hex": "6f6c6c616d612070756c6c206d6f64656c732e6578616d706c652e746573742f7465616d2f6d6f64656c3a6c6174657374",
+            "expected_line": 1,
+            "expected_confidence": "medium",
+            "expected_detection": "pattern",
+            "expected_proof_level": "L0",
+            "expected_fingerprint": "d0a154136f4d85c51fce1dfd"
+          },
+          {
+            "path": "contract-fixtures/common/sp282-positive-b.sh",
+            "source_hex": "6f6c6c616d612072756e206c6f63616c686f73743a353030302f7465616d2f6d6f64656c",
+            "expected_line": 1,
+            "expected_confidence": "medium",
+            "expected_detection": "pattern",
+            "expected_proof_level": "L0",
+            "expected_fingerprint": "accb0a58f24bef48b46c53c9"
+          },
+          {
+            "path": "contract-fixtures/common/sp282-positive-c.sh",
+            "source_hex": "6f6c6c616d612070756c6c2072656769737472792e6f6c6c616d612e61693a353434332f7465616d2f6d6f64656c",
+            "expected_line": 1,
+            "expected_confidence": "medium",
+            "expected_detection": "pattern",
+            "expected_proof_level": "L0",
+            "expected_fingerprint": "607e48008f16b70a6923e6b5"
+          }
+        ],
+        "negative": [
+          {
+            "path": "contract-fixtures/common/sp282-negative-a.sh",
+            "source_hex": "6f6c6c616d612070756c6c2067656d6d6134"
+          },
+          {
+            "path": "contract-fixtures/common/sp282-negative-b.sh",
+            "source_hex": "6f6c6c616d612072756e206d797465616d2f6d6f64656c3a6c6174657374"
+          },
+          {
+            "path": "contract-fixtures/common/sp282-negative-c.sh",
+            "source_hex": "6f6c6c616d612070756c6c206c6962726172792f6c6c616d61332e32"
+          },
+          {
+            "path": "contract-fixtures/common/sp282-negative-d.sh",
+            "source_hex": "6f6c6c616d612070756c6c2072656769737472792e6f6c6c616d612e61692f6c6962726172792f67656d6d6134"
+          },
+          {
+            "path": "contract-fixtures/common/sp282-negative-e.sh",
+            "source_hex": "6563686f20226f6c6c616d612070756c6c206d6f64656c732e6578616d706c652e746573742f7465616d2f6d6f64656c22"
+          }
+        ],
+        "adversarial": [
+          {
+            "path": "contract-fixtures/common/sp282-adversarial-a.sh",
+            "source_hex": "6f6c6c616d612070756c6c2072656769737472792e6f6c6c616d612e61692f6c6962726172792f67656d6d6134",
+            "expected": false,
+            "rationale": "An explicitly written default Ollama registry remains trusted and must not be confused with an external host."
+          },
+          {
+            "path": "contract-fixtures/common/sp282-adversarial-b.sh",
+            "source_hex": "6f6c6c616d612070756c6c2072656769737472792e6f6c6c616d612e61693a3434332f6c6962726172792f67656d6d6134",
+            "expected": false,
+            "rationale": "The explicit standard HTTPS port on Ollama's default registry does not change the registry trust root and must stay silent."
           }
         ]
       }
@@ -10654,47 +10681,6 @@
           {
             "path": "contract-fixtures/common/sp582-adversarial-a.py",
             "source_hex": "58656469732e7365746e780928096c6f636b5f6b6579202c20746f6b656e2029",
-            "expected": false,
-            "rationale": "A one-boundary near miss preserves most of the suspicious syntax while changing the detector's required token or delimiter; it records the current evasion and false-positive boundary without claiming data-flow reconstruction."
-          }
-        ]
-      }
-    },
-    {
-      "rule_id": "SP583",
-      "title": "BullMQ job worker instantiated without stalledInterval configuration",
-      "category": "reliability",
-      "expected_severity": "medium",
-      "expected_confidence": "high",
-      "cwe": "CWE-703",
-      "frameworks": [],
-      "false_positive_analysis": "Test fixtures or local mock environments may trigger this rule; verify whether the code path runs in production.",
-      "cases": {
-        "positive": [
-          {
-            "path": "contract-fixtures/common/sp583-positive-a.ts",
-            "source_hex": "6e657709576f726b65722028202029",
-            "expected_line": 1,
-            "expected_confidence": "high",
-            "expected_detection": "pattern",
-            "expected_proof_level": "L0",
-            "expected_fingerprint": "04d21018e5f5ede3a330cf46"
-          }
-        ],
-        "negative": [
-          {
-            "path": "contract-fixtures/common/sp583-negative-a.ts",
-            "source_hex": "21657709576f726b65722028202029"
-          },
-          {
-            "path": "contract-fixtures/common/sp583-negative-b.ts",
-            "source_hex": "20657709576f726b65722028202029"
-          }
-        ],
-        "adversarial": [
-          {
-            "path": "contract-fixtures/common/sp583-adversarial-a.ts",
-            "source_hex": "58657709576f726b65722028202029",
             "expected": false,
             "rationale": "A one-boundary near miss preserves most of the suspicious syntax while changing the detector's required token or delimiter; it records the current evasion and false-positive boundary without claiming data-flow reconstruction."
           }

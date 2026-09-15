@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_on": "2026-08-26",
+  "generated_on": "2026-08-27",
   "status": "research_only",
   "selection": "CWE weakness variants ranked by CWE-declared language, language-class, and technology applicability; explicit incompatible language declarations are excluded",
   "promotion_boundary": "No candidate is executable until it has ecosystem-specific semantics, positive, negative, and adversarial fixtures, false-positive analysis, and measured precision",
@@ -169,9 +169,9 @@
     "taxonomy_only": 9
   },
   "dedup_disposition_counts": {
-    "coverage_gap": 4385,
-    "distinct_ecosystem_variant": 255,
-    "extend_or_replace_existing": 360
+    "coverage_gap": 4380,
+    "distinct_ecosystem_variant": 257,
+    "extend_or_replace_existing": 363
   },
   "root_overlap": {
     "unique_cwe_roots": 635,
@@ -20318,9 +20318,11 @@
           ]
         }
       ],
-      "existing_rule_ids": [],
+      "existing_rule_ids": [
+        "SP099"
+      ],
       "existing_ecosystem_rule_ids": [],
-      "dedup_disposition": "coverage_gap",
+      "dedup_disposition": "distinct_ecosystem_variant",
       "root_overlap_group": "CWE-272",
       "recommended_route": "ecosystem_semantic_review",
       "promotion_status": "research_only",
@@ -42865,9 +42867,13 @@
           ]
         }
       ],
-      "existing_rule_ids": [],
-      "existing_ecosystem_rule_ids": [],
-      "dedup_disposition": "coverage_gap",
+      "existing_rule_ids": [
+        "SP099"
+      ],
+      "existing_ecosystem_rule_ids": [
+        "SP099"
+      ],
+      "dedup_disposition": "extend_or_replace_existing",
       "root_overlap_group": "CWE-272",
       "recommended_route": "ecosystem_semantic_review",
       "promotion_status": "research_only",
@@ -172070,9 +172076,13 @@
           ]
         }
       ],
-      "existing_rule_ids": [],
-      "existing_ecosystem_rule_ids": [],
-      "dedup_disposition": "coverage_gap",
+      "existing_rule_ids": [
+        "SP099"
+      ],
+      "existing_ecosystem_rule_ids": [
+        "SP099"
+      ],
+      "dedup_disposition": "extend_or_replace_existing",
       "root_overlap_group": "CWE-272",
       "recommended_route": "ecosystem_semantic_review",
       "promotion_status": "research_only",
@@ -197047,9 +197057,11 @@
           ]
         }
       ],
-      "existing_rule_ids": [],
+      "existing_rule_ids": [
+        "SP099"
+      ],
       "existing_ecosystem_rule_ids": [],
-      "dedup_disposition": "coverage_gap",
+      "dedup_disposition": "distinct_ecosystem_variant",
       "root_overlap_group": "CWE-272",
       "recommended_route": "ecosystem_semantic_review",
       "promotion_status": "research_only",
@@ -223118,9 +223130,13 @@
           ]
         }
       ],
-      "existing_rule_ids": [],
-      "existing_ecosystem_rule_ids": [],
-      "dedup_disposition": "coverage_gap",
+      "existing_rule_ids": [
+        "SP099"
+      ],
+      "existing_ecosystem_rule_ids": [
+        "SP099"
+      ],
+      "dedup_disposition": "extend_or_replace_existing",
       "root_overlap_group": "CWE-272",
       "recommended_route": "ecosystem_semantic_review",
       "promotion_status": "research_only",

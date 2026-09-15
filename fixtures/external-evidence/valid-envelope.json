@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "tool": {
+    "name": "example-linter",
+    "version": "1.2.3",
+    "command": "lint"
+  },
+  "verdict": "REVIEW",
+  "limitations": [
+    "Synthetic fixture. Not a ShipProof native finding."
+  ],
+  "target_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "config_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "captured_at": "2026-09-15T00:00:00Z",
+  "findings": [
+    {
+      "original_rule_id": "EX-001",
+      "severity": "medium",
+      "path": "src/app.py",
+      "line": 12,
+      "message": "Example imported diagnostic; token sk-exampletestvalue stays redacted."
+    }
+  ]
+}

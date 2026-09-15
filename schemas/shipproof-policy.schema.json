@@ -21,6 +21,10 @@
           "type": "integer",
           "minimum": 1024,
           "maximum": 100000000
+        },
+        "profile": {
+          "enum": ["auto", "application", "library"],
+          "default": "auto"
         }
       }
     },
@@ -30,6 +34,16 @@
       "properties": {
         "fail_on": {
           "enum": ["critical", "high", "medium", "low", "none"]
+        },
+        "fail_on_incomplete": {
+          "type": "boolean",
+          "default": false,
+          "description": "For standalone scan integrations, fail the gate if selected source content is omitted or a container is not inspected. The production check command is fail-closed regardless of this repository-authored setting."
+        },
+        "block_min_proof": {
+          "enum": ["L0", "L1", "L2"],
+          "default": "L1",
+          "description": "Minimum proof level required for a finding to fail the security gate. The production check command will not honor a value below L1."
         }
       }
     },

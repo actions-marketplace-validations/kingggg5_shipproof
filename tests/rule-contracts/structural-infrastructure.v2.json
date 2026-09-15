@@ -1,0 +1,101 @@
+{
+  "schema_version": 2,
+  "quality_contract_version": 2,
+  "engine": "structural",
+  "ecosystem": "infrastructure",
+  "rules": [
+    {
+      "rule_id": "SP210",
+      "title": "GitHub Actions workflow script injection",
+      "category": "security",
+      "expected_severity": "high",
+      "expected_confidence": "high",
+      "cwe": "CWE-78",
+      "frameworks": [],
+      "false_positive_analysis": "Only step run scalars in .github/workflows are checked. env, with, names, YAML comments and scalar prose stay silent. Flow maps, aliases and multiline expressions are unresolved; script reachability still requires review.",
+      "cases": {
+        "positive": [
+          {
+            "path": "contract-fixtures/precision/sp210/positive-inline/.github/workflows/ci.yml",
+            "source_hex": "6e616d653a2043490a6f6e3a2070756c6c5f726571756573740a6a6f62733a0a202063693a0a2020202072756e732d6f6e3a207562756e74752d6c61746573740a2020202073746570733a0a2020202020202d2072756e3a206563686f2022247b7b206769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d220a",
+            "expected_line": 7,
+            "expected_confidence": "high",
+            "expected_detection": "structural",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "05b6bd0bb974ffd59dd5304b"
+          },
+          {
+            "path": "contract-fixtures/precision/sp210/positive-block/.github/workflows/ci.yml",
+            "source_hex": "6e616d653a2043490a6f6e3a2070756c6c5f726571756573740a6a6f62733a0a202063693a0a2020202072756e732d6f6e3a207562756e74752d6c61746573740a2020202073746570733a0a2020202020202d206e616d653a207363726970740a202020202020202072756e3a207c0a202020202020202020206563686f2022247b7b206769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d220a",
+            "expected_line": 9,
+            "expected_confidence": "high",
+            "expected_detection": "structural",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "9dbbbce507f1f39742eda178"
+          },
+          {
+            "path": "contract-fixtures/precision/sp210/positive-folded/.github/workflows/ci.yml",
+            "source_hex": "6e616d653a2043490a6f6e3a2070756c6c5f726571756573740a6a6f62733a0a202063693a0a2020202072756e732d6f6e3a207562756e74752d6c61746573740a2020202073746570733a0a2020202020202d202772756e273a203e2d0a202020202020202020206563686f2022247b7b206769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d220a",
+            "expected_line": 8,
+            "expected_confidence": "high",
+            "expected_detection": "structural",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "d4b8d5e255d0b96cb0c5855a"
+          }
+        ],
+        "negative": [
+          {
+            "path": "contract-fixtures/precision/sp210/negative-env/.github/workflows/ci.yml",
+            "source_hex": "6e616d653a2043490a6f6e3a2070756c6c5f726571756573740a6a6f62733a0a202063693a0a2020202072756e732d6f6e3a207562756e74752d6c61746573740a2020202073746570733a0a2020202020202d2072756e3a206e6f646520636865636b2e6d6a730a2020202020202020656e763a0a2020202020202020202050525f5449544c453a20247b7b206769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d0a",
+            "expected": false,
+            "rationale": "The 'env' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp210/negative-with/.github/workflows/ci.yml",
+            "source_hex": "6e616d653a2043490a6f6e3a2070756c6c5f726571756573740a6a6f62733a0a202063693a0a2020202072756e732d6f6e3a207562756e74752d6c61746573740a2020202073746570733a0a2020202020202d20757365733a206c6f63616c2f616374696f6e4076310a2020202020202020776974683a0a202020202020202020207469746c653a20247b7b206769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d0a",
+            "expected": false,
+            "rationale": "The 'with' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp210/negative-name/.github/workflows/ci.yml",
+            "source_hex": "6e616d653a2043490a6f6e3a2070756c6c5f726571756573740a6a6f62733a0a202063693a0a2020202072756e732d6f6e3a207562756e74752d6c61746573740a2020202073746570733a0a2020202020202d206e616d653a20247b7b206769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d0a202020202020202072756e3a206563686f20736166650a",
+            "expected": false,
+            "rationale": "The 'name' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp210/negative-comment/.github/workflows/ci.yml",
+            "source_hex": "6e616d653a2043490a6f6e3a2070756c6c5f726571756573740a6a6f62733a0a202063693a0a2020202072756e732d6f6e3a207562756e74752d6c61746573740a2020202073746570733a0a2020202020202d2072756e3a206563686f2073616665202320247b7b206769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d0a",
+            "expected": false,
+            "rationale": "The 'comment' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp210/negative-non-workflow/settings.yml",
+            "source_hex": "72756e3a206563686f2022247b7b206769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d220a",
+            "expected": false,
+            "rationale": "The 'non-workflow' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp210/negative-run-word-in-env/.github/workflows/ci.yml",
+            "source_hex": "6e616d653a2043490a6f6e3a2070756c6c5f726571756573740a6a6f62733a0a202063693a0a2020202072756e732d6f6e3a207562756e74752d6c61746573740a2020202073746570733a0a2020202020202d20656e763a0a20202020202020202020544558543a207c0a20202020202020202020202072756e3a206563686f2022247b7b206769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d220a202020202020202072756e3a206563686f20736166650a",
+            "expected": false,
+            "rationale": "The 'run-word-in-env' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          }
+        ],
+        "adversarial": [
+          {
+            "path": "contract-fixtures/precision/sp210/adversarial-quoted-env/.github/workflows/ci.yml",
+            "source_hex": "6e616d653a2043490a6f6e3a2070756c6c5f726571756573740a6a6f62733a0a202063693a0a2020202072756e732d6f6e3a207562756e74752d6c61746573740a2020202073746570733a0a2020202020202d20656e763a0a20202020202020202020544558543a20226d756c74696c696e650a20202020202020202020202072756e3a206563686f2027247b7b206769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d27220a202020202020202072756e3a206563686f20736166650a",
+            "expected": false,
+            "rationale": "The 'quoted-env' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp210/adversarial-documentation/.github/workflows/ci.yml",
+            "source_hex": "6465736372697074696f6e3a207c0a20206a6f62733a0a2020202063693a0a20202020202073746570733a0a20202020202020202d2072756e3a206563686f2022247b7b206769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d220a",
+            "expected": false,
+            "rationale": "The 'documentation' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          }
+        ]
+      }
+    }
+  ]
+}

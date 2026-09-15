@@ -21,6 +21,10 @@ inputs:
     description: Minimum severity that fails the step (critical, high, medium, low, or none).
     required: false
     default: high
+  fail-on-incomplete:
+    description: Fail if selected source content is omitted or a container is not inspected (true or false).
+    required: false
+    default: "true"
   baseline:
     description: Optional repository-relative fingerprint baseline.
     required: false
@@ -47,6 +51,7 @@ runs:
         SHIPPROOF_INPUT_FORMAT: ${{ inputs.format }}
         SHIPPROOF_INPUT_OUTPUT: ${{ inputs.output }}
         SHIPPROOF_INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        SHIPPROOF_INPUT_FAIL_ON_INCOMPLETE: ${{ inputs.fail-on-incomplete }}
         SHIPPROOF_INPUT_BASELINE: ${{ inputs.baseline }}
         SHIPPROOF_INPUT_CHANGED_SINCE: ${{ inputs.changed-since }}
         SHIPPROOF_INPUT_MAX_FILE_BYTES: ${{ inputs.max-file-bytes }}

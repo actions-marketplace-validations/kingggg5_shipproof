@@ -374,6 +374,10 @@ class EvalDatasetScopeTests(unittest.TestCase):
         self.assertEqual(determine_scope("src/evals.json"), "app")
         self.assertEqual(determine_scope("evals/other.json"), "app")
 
+    def test_jsonl_files_are_scannable_text(self):
+        self.assertTrue(scan_repo.is_text_file(Path("benchmarks/labels/clean-corpus.jsonl")))
+        self.assertTrue(scan_repo.is_text_file(Path("eval/dataset.jsonl")))
+
     def test_findings_in_eval_datasets_do_not_block_the_gate(self):
         source = json.dumps({"api_key": "K7mQ2xR9" + "nP4wL8sT3vY1"})
         findings, _ = scan_repository_root(source)

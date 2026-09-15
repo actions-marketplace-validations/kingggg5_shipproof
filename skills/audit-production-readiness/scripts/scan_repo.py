@@ -36,7 +36,7 @@ from pathlib import Path
 import archive_inspect
 import precision as precision_policy
 
-VERSION = "0.10.0"
+VERSION = "0.11.0"
 MAX_SNIPPET_BYTES = 200_000
 MAX_SCAN_LINE_CHARS = 8_192
 CONTEXT_LEVELS = ("summary", "overview", "full")
@@ -124,6 +124,7 @@ TEXT_SUFFIXES = {
     ".less",
     ".cff",
     ".json",
+    ".jsonl",
     ".yaml",
     ".yml",
     ".toml",

@@ -113,6 +113,10 @@ class StructureTests(unittest.TestCase):
                 r"All (\d+) executable scanner rules",
                 r"change the (\d+)-rule public catalog",
             ),
+            "docs/releases/v0.11.0.md": (
+                r"All (\d+) executable scanner rules",
+                r"change the (\d+)-rule public catalog",
+            ),
         }
         for path, patterns in current_rule_claims.items():
             content = (ROOT / path).read_text(encoding="utf-8")

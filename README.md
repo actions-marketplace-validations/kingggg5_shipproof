@@ -12,7 +12,7 @@ Security · Correctness · Scale · Performance · Release evidence
 
 [![CI](https://github.com/kingggg5/shipproof/actions/workflows/ci.yml/badge.svg)](https://github.com/kingggg5/shipproof/actions/workflows/ci.yml)
 [![Security](https://github.com/kingggg5/shipproof/actions/workflows/security.yml/badge.svg)](https://github.com/kingggg5/shipproof/actions/workflows/security.yml)
-[![Release](https://img.shields.io/badge/release-v0.10.0-2563eb)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/release-v0.11.0-2563eb)](CHANGELOG.md)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933)](package.json)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -71,7 +71,7 @@ ShipProof applies the same review contract regardless of who wrote the code. Its
 
 | Property | Current contract |
 | :--- | :--- |
-| Current release | `v0.10.0` reviewed release |
+| Current release | `v0.11.0` reviewed release |
 | Runtime | Node.js 20+; Python 3.10+ for scanner-backed commands |
 | Executable rules | 635 (`SP001`–`SP665`, with deliberate reserved gaps) |
 | Evidence levels | `L0` pattern, `L1` structural/artifact, `L2` interprocedural taint (`--cross-file`; Python + JavaScript/TypeScript) |
@@ -183,12 +183,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: kingggg5/shipproof@v0.10.0
+      - uses: kingggg5/shipproof@v0.11.0
         with:
           fail-on: high
 ```
 
-The action writes a structured Markdown status card to the GitHub Step Summary. The example uses the `v0.10.0` release tag; pin the action to a reviewed full commit SHA when an immutable supply-chain reference is required.
+The action writes a structured Markdown status card to the GitHub Step Summary. The example uses the `v0.11.0` release tag; pin the action to a reviewed full commit SHA when an immutable supply-chain reference is required.
 
 For pull requests that touch a large repository, scan only what changed relative to the base branch:
 
@@ -196,7 +196,7 @@ For pull requests that touch a large repository, scan only what changed relative
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: kingggg5/shipproof@v0.10.0
+      - uses: kingggg5/shipproof@v0.11.0
         with:
           fail-on: high
           changed-since: origin/main
@@ -207,7 +207,7 @@ The scanner resolves the git diff (added, copied, modified, and renamed files, p
 The default report format is `sarif`, which the action writes into the workspace. To surface findings as inline Code Scanning alerts, upload that artifact with GitHub's official action after the gate step:
 
 ```yaml
-      - uses: kingggg5/shipproof@v0.10.0
+      - uses: kingggg5/shipproof@v0.11.0
         with:
           fail-on: high
           format: sarif

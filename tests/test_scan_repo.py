@@ -1926,6 +1926,16 @@ def safe(page_size: int = Query(50, ge=1, le=100)): ...
         findings = self.findings("Proxy.cs", source)
         self.assertFalse(any(f.rule_id == "SP109" for f in findings))
 
+    def test_sp121_csharp_request_redirect_is_flagged(self):
+        source = 'return Redirect(Request.Query["next"]);\n'
+        findings = self.findings("LoginController.cs", source)
+        self.assertTrue(any(f.rule_id == "SP121" for f in findings))
+
+    def test_sp121_csharp_local_constant_redirect_is_not_flagged(self):
+        source = 'return Redirect("/dashboard");\n'
+        findings = self.findings("LoginController.cs", source)
+        self.assertFalse(any(f.rule_id == "SP121" for f in findings))
+
     def test_sp625_csharp_unawaited_task_run(self):
         source = (
             "public async Task<IActionResult> PostHandler() {\n    "

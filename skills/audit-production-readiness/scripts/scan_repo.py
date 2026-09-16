@@ -6011,12 +6011,14 @@ RULES: tuple[Rule, ...] = (
         "security",
         "medium",
         "medium",
-        compile_pattern(r"""redirect\s*\(\s*(?:req|request)\s*\."""),
+        compile_pattern(
+            r"""(?:redirect\s*\(\s*(?:req|request)\s*\.|Redirect\s*\(\s*(?:Request|request)\.(?:Query|Form|Headers)\b)"""
+        ),
         "A redirect target is taken directly from request input, enabling open-redirect phishing attacks.",
         "Redirect only to validated allowlisted paths or relative URLs.",
         "CWE-601",
         "OWASP ASVS V5",
-        frozenset({".js", ".py", ".ts", ".mjs", ".jsx", ".cjs"}),
+        frozenset({".js", ".py", ".ts", ".mjs", ".jsx", ".cjs", ".cs"}),
     ),
     Rule(
         "SP122",

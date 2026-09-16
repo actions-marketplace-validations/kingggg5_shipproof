@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "generated_on": "2026-08-27",
+  "generated_on": "2026-09-16",
   "status": "research_only",
   "selection": "CWE weakness variants ranked by CWE-declared language, language-class, and technology applicability; explicit incompatible language declarations are excluded",
   "promotion_boundary": "No candidate is executable until it has ecosystem-specific semantics, positive, negative, and adversarial fixtures, false-positive analysis, and measured precision",
   "source_cwe_catalog_version": "4.20",
   "source_cwe_archive_sha256": "3976f599e5e5200219a3108bb896d06e2a88fbb293369e1883cb423a5e9d7d50",
-  "existing_scanner_version": "0.10.0",
+  "existing_scanner_version": "0.11.2",
   "existing_rule_count": 635,
   "candidate_count": 5000,
   "allocations": {
@@ -2878,6 +2878,7 @@
         "SP616"
       ],
       "existing_ecosystem_rule_ids": [
+        "SP121",
         "SP148"
       ],
       "dedup_disposition": "extend_or_replace_existing",

@@ -5844,7 +5844,7 @@ RULES: tuple[Rule, ...] = (
         "high",
         "medium",
         compile_pattern(
-            r"""(?:(?:get|post|put|delete|request|head)\s*\(\s*["'`]https?://(?:169\.254\.169\.254|metadata\.google\.internal|127\.0\.0\.1|localhost)|(?:requests|httpx|fetch|axios|http)\.(?:get|post|put|delete|request)\s*\(\s*(?:req\.query|request\.args|req\.body|user_url|user_input)\b)"""
+            r"""(?:(?:get|post|put|delete|request|head)\s*\(\s*["'`]https?://(?:169\.254\.169\.254|metadata\.google\.internal|127\.0\.0\.1|localhost)|(?:requests|httpx|fetch|axios|http)\.(?:get|post|put|delete|request)\s*\(\s*(?:req\.query|request\.args|req\.body|user_url|user_input)\b|(?:httpClient|_?client)\.(?:GetAsync|GetStringAsync|PostAsync|SendAsync)\s*\(\s*(?:Request|request)\.(?:Query|Form|Headers)\b)"""
         ),
         "An outbound HTTP request may target internal endpoints, localhost, or cloud metadata.",
         "Validate destination URLs against an allowlist and block private IP ranges.",

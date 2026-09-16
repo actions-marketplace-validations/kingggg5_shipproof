@@ -378,12 +378,12 @@
           },
           {
             "path": "contract-fixtures/common/sp109-positive-b.py",
-            "source_hex": "64656c65746509202809202768747470733a2f2f3136392e3235342e3136392e3235343b0a",
+            "source_hex": "5f636c69656e742e476574537472696e674173796e630920280920726571756573742e486561646572733b0a",
             "expected_line": 1,
             "expected_confidence": "medium",
             "expected_detection": "pattern",
             "expected_proof_level": "L0",
-            "expected_fingerprint": "9b46704dccfb0311dfe44181"
+            "expected_fingerprint": "b899c1171b31b460da17d7c8"
           }
         ],
         "negative": [

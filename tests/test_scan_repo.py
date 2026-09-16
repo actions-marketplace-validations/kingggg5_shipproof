@@ -1916,6 +1916,16 @@ def safe(page_size: int = Query(50, ge=1, le=100)): ...
         findings = self.findings("Files.cs", source)
         self.assertFalse(any(f.rule_id == "SP110" for f in findings))
 
+    def test_sp109_csharp_request_url_is_flagged(self):
+        source = 'var response = httpClient.GetAsync(Request.Query["url"]);\n'
+        findings = self.findings("Proxy.cs", source)
+        self.assertTrue(any(f.rule_id == "SP109" for f in findings))
+
+    def test_sp109_csharp_configured_url_is_not_flagged(self):
+        source = 'var response = httpClient.GetAsync(configuration["DirectoryUrl"]);\n'
+        findings = self.findings("Proxy.cs", source)
+        self.assertFalse(any(f.rule_id == "SP109" for f in findings))
+
     def test_sp625_csharp_unawaited_task_run(self):
         source = (
             "public async Task<IActionResult> PostHandler() {\n    "

@@ -1,11 +1,12 @@
-# Dart and C#/.NET Wave 1 — research-only rule candidates
+# Dart and C#/.NET Wave 1 — research candidates and scoped promotions
 
-Date: 2026-09-16 · Status: research-only · Executable rules added: **0**
+Date: 2026-09-16 · Status: staged promotion · New executable rule IDs: **0** · Existing-rule extensions: **6**
 
-This is the first 20-item slice of the larger promotion program. These records are
-not `SPxxx` findings and must not affect scan verdicts until they have executable
-positive, realistic-negative, adversarial, walker, precision, and performance
-evidence. Existing coverage wins over a duplicate candidate.
+This is the first 20-item slice of the larger promotion program. Fourteen records
+remain research-only and are not `SPxxx` findings. Six high-signal cases extend
+existing rules with dedicated positive/negative walker tests; they preserve the
+existing rule IDs, severities, gates, and fingerprints. Existing coverage wins
+over a duplicate candidate.
 
 Primary references used for the initial review include [Dart static analysis](https://dart.dev/tools/dart-analyze), [Dart null safety](https://dart.dev/null-safety), [Dart `HttpOverrides`](https://api.dart.dev/dart-io/HttpOverrides-class.html), [Flutter networking](https://docs.flutter.dev/data-and-backend/networking), [webview_flutter](https://pub.dev/packages/webview_flutter), [.NET security analysis](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/quality-rules/security-warnings), [ASP.NET Core authorization](https://learn.microsoft.com/en-us/aspnet/core/security/authorization/introduction), [CA2100 parameterized SQL](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/quality-rules/ca2100), [ASP.NET Core file uploads](https://learn.microsoft.com/en-us/aspnet/core/mvc/models/file-uploads), and [ASP.NET Core data protection](https://learn.microsoft.com/en-us/aspnet/core/security/data-protection/introduction).
 

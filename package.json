@@ -79,7 +79,7 @@
     "node": ">=20"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "zod": "3.25.76"
   },
   "peerDependenciesMeta": {
@@ -91,8 +91,13 @@
     }
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "zod": "3.25.76"
+  },
+  "overrides": {
+    "fast-uri": "3.1.6",
+    "hono": "4.13.8",
+    "qs": "6.16.0"
   },
   "publishConfig": {
     "access": "public",

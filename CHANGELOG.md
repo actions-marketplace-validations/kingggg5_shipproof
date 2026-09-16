@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Refresh the optional MCP development SDK to `1.30.0` and pin its transitive URI, parser, and framework dependencies to audited patched versions (`fast-uri`, `hono`, `qs`). Runtime production dependencies remain zero; `npm audit` reports no known vulnerabilities.
+
 ## 0.11.2 - 2026-09-15
 
 - Treat generated `.sarif` reports as recognized assets so a leftover Action/CLI report is not an unknown-binary coverage hole and is not re-scanned as source. See [docs/releases/v0.11.2.md](docs/releases/v0.11.2.md).

@@ -153,4 +153,9 @@ jobs:
       - name: Enforce Python branch coverage
         run: npm run test:python:coverage
       - name: Enforce Node line coverage
+        env:
+          # The coverage runner executes the repository self-check under
+          # instrumentation; keep its fail-closed timeout, but allow normal
+          # hosted-runner variance without changing the CLI default.
+          SHIPPROOF_GATE_TIMEOUT_MS: "180000"
         run: npm run test:node:coverage

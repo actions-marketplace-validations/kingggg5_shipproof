@@ -61,5 +61,7 @@ This wave intentionally adds research records instead of noisy findings. The nex
 ## First promotion slice status (2026-09-16)
 
 - DART-W1-01 is implemented as a scoped extension of existing `SP624` rather than a duplicate rule ID. It recognizes security-sensitive Dart names assigned from `Random().nextInt/nextDouble` while keeping UI-animation randomness silent.
+- DART-W1-02 is implemented as a scoped extension of existing `SP104`. It recognizes Dart `badCertificateCallback` callbacks that accept every certificate while keeping pinned-certificate callbacks silent.
 - DOTNET-W1-02 is implemented as a scoped extension of existing `SP103`. It recognizes interpolated C# `FromSqlRaw`/`ExecuteSqlRaw`-style calls while keeping parameterized raw SQL silent.
+- DOTNET-W1-03 is implemented as a scoped extension of existing `SP110`. It recognizes request-derived `Path.Combine` inputs while keeping static asset paths silent.
 - Both extensions have walker-facing positive/negative tests and regenerated pattern contracts. Severity, gate eligibility, and rule count are unchanged. The remaining 18 records stay research-only until structural evidence exists.

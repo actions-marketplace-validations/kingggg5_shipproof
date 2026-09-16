@@ -1896,6 +1896,26 @@ def safe(page_size: int = Query(50, ge=1, le=100)): ...
         findings = self.findings("Users.cs", source)
         self.assertFalse(any(f.rule_id == "SP103" for f in findings))
 
+    def test_sp104_dart_bad_certificate_callback_is_flagged(self):
+        source = "client.badCertificateCallback = (cert, host, port) => true;\n"
+        findings = self.findings("client.dart", source)
+        self.assertTrue(any(f.rule_id == "SP104" for f in findings))
+
+    def test_sp104_dart_certificate_callback_is_not_flagged(self):
+        source = "client.badCertificateCallback = (cert, host, port) => cert.pem == pinned;\n"
+        findings = self.findings("client.dart", source)
+        self.assertFalse(any(f.rule_id == "SP104" for f in findings))
+
+    def test_sp110_csharp_request_path_combine_is_flagged(self):
+        source = 'var path = Path.Combine(root, Request.Query["file"]);\nreturn PhysicalFile(path, contentType);\n'
+        findings = self.findings("Files.cs", source)
+        self.assertTrue(any(f.rule_id == "SP110" for f in findings))
+
+    def test_sp110_csharp_static_path_combine_is_not_flagged(self):
+        source = 'var path = Path.Combine(root, "assets", "logo.svg");\n'
+        findings = self.findings("Files.cs", source)
+        self.assertFalse(any(f.rule_id == "SP110" for f in findings))
+
     def test_sp625_csharp_unawaited_task_run(self):
         source = (
             "public async Task<IActionResult> PostHandler() {\n    "

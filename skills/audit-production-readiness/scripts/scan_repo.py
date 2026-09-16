@@ -5772,7 +5772,9 @@ RULES: tuple[Rule, ...] = (
         "security",
         "high",
         "high",
-        compile_pattern(r"""\b(?:verify|rejectUnauthorized)\s*[:=]\s*(?:false|False)\b"""),
+        compile_pattern(
+            r"""(?:\b(?:verify|rejectUnauthorized)\s*[:=]\s*(?:false|False)\b|\bbadCertificateCallback\s*=\s*\([^)]*\)\s*=>\s*true\b)"""
+        ),
         "TLS peer verification is explicitly disabled.",
         "Restore certificate verification and configure the correct trust chain.",
         "CWE-295",
@@ -5857,7 +5859,7 @@ RULES: tuple[Rule, ...] = (
         "high",
         "medium",
         compile_pattern(
-            r"""(?:(?<![\w.$])open\s*\(\s*(?:f["'][^"']*\{|`[^`]*\$\{)|(?:fs\.)?(?:readFile|readFileSync|writeFileSync|createReadStream|unlink|rmSync)\s*\(\s*`[^`]*\$\{|(?:path\.)?join\s*\([^)]*(?:req\.|params|query|user_input))"""
+            r"""(?:(?<![\w.$])open\s*\(\s*(?:f["'][^"']*\{|`[^`]*\$\{)|(?:fs\.)?(?:readFile|readFileSync|writeFileSync|createReadStream|unlink|rmSync)\s*\(\s*`[^`]*\$\{|(?:path\.)?join\s*\([^)]*(?:req\.|params|query|user_input)|(?:Path|path)\.Combine\s*\([^)]*(?:Request|request|Query|Form|Route))"""
         ),
         "A filesystem operation constructs paths directly from variables without visible normalization.",
         "Normalize with realpath/resolve and verify the path remains inside the base directory.",

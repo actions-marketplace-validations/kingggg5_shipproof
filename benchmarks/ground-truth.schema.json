@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kingggg5/shipproof/benchmarks/ground-truth.schema.json",
+  "title": "ShipProof independent defect ground truth",
+  "description": "Scanner-independent defect lists for recall measurement. Sources must be advisories, fix commits, or challenge catalogs reviewed separately from scanner alerts. Labeling only what the scanner already reported cannot measure missed bugs, so such lists are rejected by review.",
+  "type": "object",
+  "required": ["schema_version", "repo", "revision", "defects"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "repo": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "defects": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "required": ["id", "path", "line", "cwe", "reference"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "path": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "line": { "type": "integer", "minimum": 1 },
+          "cwe": { "type": "string", "pattern": "^CWE-[0-9]+$" },
+          "reference": { "type": "string", "minLength": 1, "maxLength": 512 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

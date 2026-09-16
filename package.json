@@ -1,6 +1,6 @@
 {
   "name": "@kingggg5/shipproof",
-  "version": "0.11.1",
+  "version": "0.11.2",
   "description": "Zero-dependency production gate, resource budget, and capacity model for AI-assisted code",
   "type": "module",
   "bin": {
@@ -17,6 +17,9 @@
     "!docs/assets/shipproof-logo.svg",
     "!docs/assets/shipproof-workflow.png",
     "!docs/precision-plan.md",
+    "!docs/next-development-plan.md",
+    "!schemas/comment-anchor.schema.json",
+    "!schemas/triage-assessment.schema.json",
     "examples/capacity/*.js",
     "examples/capacity/*.json",
     "examples/demo-api/README.md",
@@ -38,6 +41,9 @@
     "!skills/audit-production-readiness/scripts/analysis.py",
     "!skills/audit-production-readiness/scripts/future_phases.py",
     "!skills/audit-production-readiness/scripts/ir.py",
+    "!skills/audit-production-readiness/scripts/comment_anchors.py",
+    "!skills/audit-production-readiness/scripts/rule_search.py",
+    "!skills/audit-production-readiness/scripts/triage_trail.py",
     "skills/engineer-production-systems/SKILL.md",
     "skills/engineer-production-systems/agents",
     "skills/engineer-production-systems/references",

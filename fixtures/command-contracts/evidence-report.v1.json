@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "tool": {
     "name": "ShipProof",
-    "version": "0.11.1",
+    "version": "0.11.2",
     "command": "evidence"
   },
   "verdict": "PASS_WITH_EVIDENCE",

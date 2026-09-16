@@ -1,0 +1,100 @@
+{"id": "R001", "lang": "en", "split": "development", "text": "which rule finds a committed private key", "relevant": ["SP001"]}
+{"id": "R002", "lang": "en", "split": "holdout", "text": "detect hardcoded AWS access keys in source", "relevant": ["SP002"]}
+{"id": "R003", "lang": "en", "split": "development", "text": "find dynamic code execution with eval", "relevant": ["SP101"]}
+{"id": "R004", "lang": "en", "split": "holdout", "text": "rule for shell execution being enabled", "relevant": ["SP102"]}
+{"id": "R005", "lang": "en", "split": "development", "text": "SQL query built with string interpolation", "relevant": ["SP103"]}
+{"id": "R006", "lang": "en", "split": "holdout", "text": "TLS certificate verification turned off", "relevant": ["SP104"]}
+{"id": "R007", "lang": "en", "split": "development", "text": "JWT signature verification disabled", "relevant": ["SP105"]}
+{"id": "R008", "lang": "en", "split": "holdout", "text": "server-side requests to internal network or cloud metadata", "relevant": ["SP109"]}
+{"id": "R009", "lang": "en", "split": "development", "text": "path traversal through file paths", "relevant": ["SP110"]}
+{"id": "R010", "lang": "en", "split": "holdout", "text": "unsafe archive extraction zip slip", "relevant": ["SP111"]}
+{"id": "R011", "lang": "en", "split": "development", "text": "React dangerouslySetInnerHTML with dynamic data", "relevant": ["SP116"]}
+{"id": "R012", "lang": "en", "split": "holdout", "text": "filesystem path built by joining request input", "relevant": ["SP119"]}
+{"id": "R013", "lang": "en", "split": "development", "text": "security token generated with insecure randomness", "relevant": ["SP122"]}
+{"id": "R014", "lang": "en", "split": "holdout", "text": "hardcoded initialization vector in cipher", "relevant": ["SP123"]}
+{"id": "R015", "lang": "en", "split": "development", "text": "user-controlled URL passed to fetch request", "relevant": ["SP124"]}
+{"id": "R016", "lang": "en", "split": "holdout", "text": "signature compared without constant-time check", "relevant": ["SP138"]}
+{"id": "R017", "lang": "en", "split": "development", "text": "random generator seeded with current timestamp", "relevant": ["SP141"]}
+{"id": "R018", "lang": "en", "split": "holdout", "text": "AES encryption using ECB mode", "relevant": ["SP142"]}
+{"id": "R019", "lang": "en", "split": "development", "text": "static hardcoded salt for password hashing", "relevant": ["SP143"]}
+{"id": "R020", "lang": "en", "split": "holdout", "text": "JWT verification bypassed when decoding", "relevant": ["SP144"]}
+{"id": "R021", "lang": "en", "split": "development", "text": "dynamic SQL executed through exec_sql", "relevant": ["SP145"]}
+{"id": "R022", "lang": "en", "split": "holdout", "text": "python subprocess running with shell true", "relevant": ["SP151"]}
+{"id": "R023", "lang": "en", "split": "development", "text": "hardcoded basic auth authorization header", "relevant": ["SP158"]}
+{"id": "R024", "lang": "en", "split": "holdout", "text": "SSL context that skips certificate validation", "relevant": ["SP163"]}
+{"id": "R025", "lang": "en", "split": "development", "text": "flask debug toolbar left enabled", "relevant": ["SP164"]}
+{"id": "R026", "lang": "en", "split": "holdout", "text": "django raw SQL with formatted strings", "relevant": ["SP165"]}
+{"id": "R027", "lang": "en", "split": "development", "text": "password or token sent as GET query parameter", "relevant": ["SP168"]}
+{"id": "R028", "lang": "en", "split": "holdout", "text": "CRLF header injection in response headers", "relevant": ["SP175"]}
+{"id": "R029", "lang": "en", "split": "development", "text": "CORS allowing null origin", "relevant": ["SP190"]}
+{"id": "R030", "lang": "en", "split": "holdout", "text": "cookie with samesite none but missing secure flag", "relevant": ["SP191"]}
+{"id": "R031", "lang": "en", "split": "development", "text": "debug mode switched on in production", "relevant": ["SP201"]}
+{"id": "R032", "lang": "en", "split": "holdout", "text": "npm install script using unsafe permissions", "relevant": ["SP213"]}
+{"id": "R033", "lang": "en", "split": "development", "text": "nginx allowing old TLS protocol versions", "relevant": ["SP223"]}
+{"id": "R034", "lang": "en", "split": "holdout", "text": "MCP tool that runs shell commands", "relevant": ["SP271"]}
+{"id": "R035", "lang": "en", "split": "development", "text": "MCP tool with unrestricted filesystem access", "relevant": ["SP272"]}
+{"id": "R036", "lang": "en", "split": "holdout", "text": "MCP tool reading environment credentials", "relevant": ["SP274"]}
+{"id": "R037", "lang": "en", "split": "development", "text": "Ollama API without authentication", "relevant": ["SP281"]}
+{"id": "R038", "lang": "en", "split": "holdout", "text": "model pulled from a non-default ollama registry", "relevant": ["SP282"]}
+{"id": "R039", "lang": "en", "split": "development", "text": "redis KEYS command in request path", "relevant": ["SP301"]}
+{"id": "R040", "lang": "en", "split": "holdout", "text": "blocking file read inside async event loop", "relevant": ["SP321"]}
+{"id": "R041", "lang": "en", "split": "development", "text": "database transaction with no statement timeout", "relevant": ["SP325"]}
+{"id": "R042", "lang": "en", "split": "holdout", "text": "connection pool without max limit or timeout", "relevant": ["SP328"]}
+{"id": "R043", "lang": "en", "split": "development", "text": "in-memory session store in clustered deployment", "relevant": ["SP337"]}
+{"id": "R044", "lang": "en", "split": "holdout", "text": "process exit called from request handler", "relevant": ["SP343"]}
+{"id": "R045", "lang": "en", "split": "development", "text": "ruby HTTP client without read timeout", "relevant": ["SP397"]}
+{"id": "R046", "lang": "en", "split": "holdout", "text": "secret exposed through NEXT_PUBLIC environment variable", "relevant": ["SP403"]}
+{"id": "R047", "lang": "en", "split": "development", "text": "vue v-html binding dynamic content", "relevant": ["SP415"]}
+{"id": "R048", "lang": "en", "split": "holdout", "text": "spring actuator endpoints open to the public", "relevant": ["SP416"]}
+{"id": "R049", "lang": "en", "split": "development", "text": "rails forgery protection turned off", "relevant": ["SP417"]}
+{"id": "R050", "lang": "en", "split": "holdout", "text": "fastapi CORS wildcard origin with credentials", "relevant": ["SP419"]}
+{"id": "R051", "lang": "en", "split": "development", "text": "nextjs server action missing authorization", "relevant": ["SP420"]}
+{"id": "R052", "lang": "en", "split": "holdout", "text": "react effect without dependency array looping renders", "relevant": ["SP423"]}
+{"id": "R053", "lang": "en", "split": "development", "text": "react state mutated directly instead of setState", "relevant": ["SP424"]}
+{"id": "R054", "lang": "en", "split": "holdout", "text": "express errors leaking stack traces to clients", "relevant": ["SP428"]}
+{"id": "R055", "lang": "en", "split": "development", "text": "express session on default memory store in production", "relevant": ["SP430"]}
+{"id": "R056", "lang": "en", "split": "holdout", "text": "liveview mount without session token check", "relevant": ["SP470"]}
+{"id": "R057", "lang": "en", "split": "development", "text": "nestjs CORS reflecting request origin", "relevant": ["SP473"]}
+{"id": "R058", "lang": "en", "split": "holdout", "text": "LLM API route without metering or quota", "relevant": ["SP501"]}
+{"id": "R059", "lang": "en", "split": "development", "text": "payment webhook handler without verification", "relevant": ["SP502"]}
+{"id": "R060", "lang": "en", "split": "holdout", "text": "stripe webhook ignoring timestamp tolerance", "relevant": ["SP510"]}
+{"id": "R061", "lang": "th", "split": "development", "text": "กฎตรวจ private key ที่หลุดเข้าโค้ด", "relevant": ["SP001"]}
+{"id": "R062", "lang": "th", "split": "development", "text": "หา eval ที่ประมวลผล input จากผู้ใช้", "relevant": ["SP101"]}
+{"id": "R063", "lang": "th", "split": "development", "text": "ตรวจ SQL ที่ต่อสตริงจากตัวแปร", "relevant": ["SP103"]}
+{"id": "R064", "lang": "th", "split": "development", "text": "ตรวจการปิดตรวจสอบลายเซ็น JWT", "relevant": ["SP105"]}
+{"id": "R065", "lang": "th", "split": "development", "text": "ช่องโหว่พาธไฟล์แบบ traversal", "relevant": ["SP110"]}
+{"id": "R066", "lang": "th", "split": "development", "text": "ใช้ innerHTML กับค่าที่มาจากผู้ใช้", "relevant": ["SP116"]}
+{"id": "R067", "lang": "th", "split": "development", "text": "สุ่มโทเค็นความปลอดภัยด้วยวิธีที่ไม่ปลอดภัย", "relevant": ["SP122"]}
+{"id": "R068", "lang": "th", "split": "development", "text": "ส่ง URL ของผู้ใช้ให้ fetch ยิงออกไป", "relevant": ["SP124"]}
+{"id": "R069", "lang": "th", "split": "development", "text": "สุ่ม seed ด้วยเวลาปัจจุบัน", "relevant": ["SP141"]}
+{"id": "R070", "lang": "th", "split": "development", "text": "ใช้เกลือคงที่ในการแฮชรหัสผ่าน", "relevant": ["SP143"]}
+{"id": "R071", "lang": "th", "split": "development", "text": "รัน SQL ตรงผ่าน exec_sql", "relevant": ["SP145"]}
+{"id": "R072", "lang": "th", "split": "development", "text": "header แบบ basic auth ที่เขียนรหัสไว้ตายตัว", "relevant": ["SP158"]}
+{"id": "R073", "lang": "th", "split": "development", "text": "เปิด toolbar ดีบักของ flask", "relevant": ["SP164"]}
+{"id": "R074", "lang": "th", "split": "development", "text": "ส่งรหัสผ่านผ่านพารามิเตอร์ GET", "relevant": ["SP168"]}
+{"id": "R075", "lang": "th", "split": "development", "text": "CORS อนุญาต origin ว่าง", "relevant": ["SP190"]}
+{"id": "R076", "lang": "th", "split": "holdout", "text": "ตรวจ AWS access key ที่ฝังในซอร์ส", "relevant": ["SP002"]}
+{"id": "R077", "lang": "th", "split": "holdout", "text": "เปิดให้รันคำสั่งเชลล์ได้", "relevant": ["SP102"]}
+{"id": "R078", "lang": "th", "split": "holdout", "text": "ปิดการตรวจสอบใบรับรอง TLS", "relevant": ["SP104"]}
+{"id": "R079", "lang": "th", "split": "holdout", "text": "ยิงคำขอไปยังเน็ตเวิร์กภายในหรือ metadata", "relevant": ["SP109"]}
+{"id": "R080", "lang": "th", "split": "holdout", "text": "แตกไฟล์ zip แบบไม่ปลอดภัย", "relevant": ["SP111"]}
+{"id": "R081", "lang": "th", "split": "holdout", "text": "เอาพาธจาก request มาต่อไฟล์", "relevant": ["SP119"]}
+{"id": "R082", "lang": "th", "split": "holdout", "text": "เขียน IV ตายตัวในโค้ดเข้ารหัส", "relevant": ["SP123"]}
+{"id": "R083", "lang": "th", "split": "holdout", "text": "เปรียบเทียบลายเซ็นแบบไม่กัน timing attack", "relevant": ["SP138"]}
+{"id": "R084", "lang": "th", "split": "holdout", "text": "เข้ารหัส AES โหมด ECB", "relevant": ["SP142"]}
+{"id": "R085", "lang": "th", "split": "holdout", "text": "ข้ามการตรวจสอบ JWT ตอน decode", "relevant": ["SP144"]}
+{"id": "R086", "lang": "th", "split": "holdout", "text": "รัน subprocess แบบ shell true", "relevant": ["SP151"]}
+{"id": "R087", "lang": "th", "split": "holdout", "text": "สร้าง SSL context แบบไม่ตรวจใบรับรอง", "relevant": ["SP163"]}
+{"id": "R088", "lang": "th", "split": "holdout", "text": "คิวรี raw ของ django ที่ format สตริง", "relevant": ["SP165"]}
+{"id": "R089", "lang": "th", "split": "holdout", "text": "ฉีด CRLF ใน header ตอบกลับ", "relevant": ["SP175"]}
+{"id": "R090", "lang": "th", "split": "holdout", "text": "คุกกี้ samesite none แต่ไม่มี secure", "relevant": ["SP191"]}
+{"id": "R091", "lang": "en", "split": "development", "text": "PEM private key checked into the repository", "relevant": ["SP001"]}
+{"id": "R092", "lang": "en", "split": "development", "text": "unsanitized input concatenated into SQL text", "relevant": ["SP103"]}
+{"id": "R093", "lang": "en", "split": "development", "text": "predictable tokens from a weak random source", "relevant": ["SP122"]}
+{"id": "R094", "lang": "en", "split": "development", "text": "development toolbar active in flask app", "relevant": ["SP164"]}
+{"id": "R095", "lang": "en", "split": "development", "text": "production running with debug enabled", "relevant": ["SP201"]}
+{"id": "R096", "lang": "en", "split": "holdout", "text": "AKIA key id found in committed code", "relevant": ["SP002"]}
+{"id": "R097", "lang": "en", "split": "holdout", "text": "certificate validation bypassed for HTTPS", "relevant": ["SP104"]}
+{"id": "R098", "lang": "en", "split": "holdout", "text": "shell equals true in process execution call", "relevant": ["SP151"]}
+{"id": "R099", "lang": "en", "split": "holdout", "text": "raw database query using python format", "relevant": ["SP165"]}
+{"id": "R100", "lang": "en", "split": "holdout", "text": "webhook signature replay protection missing", "relevant": ["SP510"]}

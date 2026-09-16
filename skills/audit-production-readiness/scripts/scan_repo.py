@@ -36,7 +36,7 @@ from pathlib import Path
 import archive_inspect
 import precision as precision_policy
 
-VERSION = "0.11.1"
+VERSION = "0.11.2"
 MAX_SNIPPET_BYTES = 200_000
 MAX_SCAN_LINE_CHARS = 8_192
 CONTEXT_LEVELS = ("summary", "overview", "full")
@@ -6286,7 +6286,7 @@ RULES: tuple[Rule, ...] = (
         "high",
         "high",
         compile_pattern(
-            r"""(?:srand\s*\(\s*(?:time|getpid)\b|random\.seed\s*\(\s*(?:time\.time|int\(time\)|None)?\s*\))"""
+            r"""(?:srand\s*\(\s*(?:time|getpid)\b|random\.seed\s*\(\s*(?:time\.time(?:\s*\(\s*\))?|int\s*\(\s*time(?:\.time(?:\s*\(\s*\))?)?\s*\)|None)?\s*\))"""
         ),
         "A pseudo-random number generator is seeded with predictable timestamp values.",
         "Use cryptographically secure PRNGs without manual timestamp seeding.",
@@ -6618,7 +6618,7 @@ RULES: tuple[Rule, ...] = (
         "security",
         "high",
         "high",
-        compile_pattern(r"""\.raw\s*\(\s*(?:f["']|["'][^"']*%[s(]|[^,]+\.format\()"""),
+        compile_pattern(r"""\.raw\s*\(\s*(?:f["']|["'][^"']*["']\s*%|[^,]+\.format\()"""),
         "Django ORM raw() query constructed with dynamic string formatting instead of query parameters.",
         "Pass query parameters as a list argument to raw(query, [params]).",
         "CWE-89",
@@ -18931,6 +18931,16 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Detail level for --explain or --fix-prompt (default: full)",
     )
     parser.add_argument(
+        "--packet-out",
+        metavar="DIR",
+        default=None,
+        help=(
+            "Write bounded opt-in review packets for the user's own agent to an "
+            "existing directory (local artifacts only, never sent anywhere; "
+            "does not change the gate verdict)"
+        ),
+    )
+    parser.add_argument(
         "--trace",
         action="store_true",
         default=False,
@@ -19340,6 +19350,45 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         else:
             print(output)
+        if arguments.packet_out is not None:
+            # Opt-in review packets ride alongside the report; they never
+            # change findings, verdicts, or exit codes on their own.
+            try:
+                import review_packets
+            except ImportError as exc:
+                raise ValueError(f"review packets unavailable: {exc}") from exc
+            packet_report = review_packets.build_packets(
+                arguments.root,
+                findings,
+                policy={
+                    "fail_on": arguments.fail_on,
+                    "block_min_proof": arguments.block_min_proof,
+                    "include_tests": bool(arguments.include_tests),
+                },
+                scanner_version=f"shipproof-scan/{VERSION}",
+                rules_identity=f"executable-rules/{len(RULES)}",
+            )
+            out_dir = Path(arguments.packet_out)
+            if not out_dir.is_dir() or out_dir.is_symlink():
+                raise ValueError(f"packet output must be an existing directory: {out_dir}")
+            safe_write_text(
+                out_dir / "ledger.json",
+                json.dumps(packet_report, indent=2) + "\n",
+                label="packet ledger",
+            )
+            for packet in packet_report["packets"]:
+                safe_write_text(
+                    out_dir / f"{packet['packet_id']}.json",
+                    json.dumps(packet, indent=2) + "\n",
+                    label="review packet",
+                )
+            counts = packet_report["counts"]
+            print(
+                f"review packets: {counts['packets']} packets, "
+                f"{counts['scheduled']} scheduled, {counts['deferred']} deferred "
+                f"-> {out_dir}",
+                file=sys.stderr,
+            )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"shipproof: {exc}", file=sys.stderr)
         return 2

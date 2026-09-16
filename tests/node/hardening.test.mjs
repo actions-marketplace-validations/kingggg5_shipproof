@@ -15,6 +15,34 @@ import { resolveTrustedExecutable } from "../../lib/executable.mjs";
 
 const { runPythonJsonCommand } = cliInternals;
 
+test("imported identity requires both digests and never attests the review", () => {
+  const root = mkdtempSync(join(tmpdir(), "shipproof-import-identity-"));
+  try {
+    const path = join(root, "evidence.json");
+    writeFileSync(path, JSON.stringify({
+      schema_version: "1.0", tool: { name: "fixture", version: "1.0.0", command: "review" },
+      verdict: "REVIEW", limitations: ["synthetic"], target_digest: "a".repeat(64),
+      config_digest: "b".repeat(64), captured_at: "2026-01-01T00:00:00Z", findings: [],
+    }));
+    for (const options of [{ expectTarget: "a".repeat(64) }, { expectConfig: "b".repeat(64) }]) {
+      const report = evidenceInternals.loadImportedEvidence(path, options);
+      assert.equal(report.identity_matches, false);
+      assert.equal(report.resume_eligible, false);
+      assert.equal(report.gate_eligible, false);
+    }
+    const verified = evidenceInternals.loadImportedEvidence(path, {
+      expectTarget: "a".repeat(64), expectConfig: "b".repeat(64),
+    });
+    assert.equal(verified.identity_matches, true);
+    assert.equal(verified.gate_eligible, false);
+    for (const value of [NaN, Infinity, -1, true]) {
+      assert.throws(() => evidenceInternals.loadImportedEvidence(path, { clockSkewMinutes: value }), /finite non-negative/);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 function fakeSpawn(overrides = {}) {
   return (_command, _args, _options) => ({
     status: 0,

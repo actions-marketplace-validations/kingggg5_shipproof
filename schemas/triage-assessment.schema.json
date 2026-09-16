@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kingggg5/shipproof/schemas/triage-assessment.schema.json",
+  "title": "ShipProof triage assessment",
+  "description": "Appended verification assessments. Native findings keep SPxxx IDs; imported hypotheses keep original_rule_id and never claim L1/L2 proof. Only human review confirms.",
+  "type": "object",
+  "required": ["fingerprint", "reviewer_type", "confirmation", "verdict", "trigger"],
+  "properties": {
+    "fingerprint": { "type": "string", "pattern": "^[0-9a-f]{8,64}$" },
+    "rule_id": { "type": "string", "pattern": "^SP[0-9]{3}$" },
+    "imported": { "type": "boolean" },
+    "original_rule_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "proof_level": { "enum": ["external", "L0", "L1", "L2"] },
+    "reviewer_type": { "enum": ["human", "model", "deterministic"] },
+    "confirmation": { "enum": ["confirmed", "unconfirmed"] },
+    "verdict": { "enum": ["true_positive", "false_positive", "needs_context", "duplicate"] },
+    "trigger": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "evidence": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 2000 } },
+    "counterevidence": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 2000 } },
+    "uncertainty": { "type": "string", "maxLength": 2000 },
+    "remediation": { "type": "string", "maxLength": 2000 },
+    "test_method": { "type": "string", "maxLength": 2000 }
+  },
+  "additionalProperties": false
+}

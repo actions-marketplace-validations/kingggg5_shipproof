@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kingggg5/shipproof/schemas/comment-anchor.schema.json",
+  "title": "ShipProof external review comment anchors",
+  "description": "Opt-in anchor claims for imported review comments. Anchors resolve only on an exact in-scope excerpt match; unresolved anchors stay review questions and are never auto-published as inline findings.",
+  "type": "object",
+  "required": ["schema_version", "revision", "comments"],
+  "properties": {
+    "schema_version": { "const": "comment-anchor/1.0" },
+    "revision": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "comments": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "required": ["path", "side", "start_line", "end_line", "excerpt"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "path": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "side": { "enum": ["old", "new"] },
+          "start_line": { "type": "integer", "minimum": 1 },
+          "end_line": { "type": "integer", "minimum": 1 },
+          "excerpt": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

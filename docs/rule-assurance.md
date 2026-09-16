@@ -1,6 +1,6 @@
 # ShipProof rule assurance inventory
 
-Version: `0.11.1`
+Version: `0.11.2`
 
 | Status | Rules | Meaning |
 | --- | ---: | --- |
@@ -8,9 +8,9 @@ Version: `0.11.1`
 | Partial | 0 | Has a manifest but misses at least one minimum |
 | Uncontracted | 0 | No explicit machine-readable polarity manifest |
 | Metadata debt | 0 | Missing CWE, remediation, or explanation fields |
-| Realistic negatives | 58 | At least one negative that looks like production code |
-| Near-miss negatives only | 577 | Token-boundary negatives without production-shaped silence |
-| High/critical missing realistic negatives | 443 | Shrink-only transitional debt |
+| Realistic negatives | 78 | At least one negative that looks like production code |
+| Near-miss negatives only | 557 | Token-boundary negatives without production-shaped silence |
+| High/critical missing realistic negatives | 423 | Shrink-only transitional debt |
 
 Zero-debt executable-rule gate: **PASS**
 

@@ -232,6 +232,15 @@
             "expected_detection": "pattern",
             "expected_proof_level": "L0",
             "expected_fingerprint": "9e17f49334b151f7c1f4dac8"
+          },
+          {
+            "path": "contract-fixtures/python/sp151-positive-c.py",
+            "source_hex": "73756270726f636573732e72756e28226c732022202b207461726765742c207368656c6c3d54727565290a",
+            "expected_line": 1,
+            "expected_confidence": "high",
+            "expected_detection": "pattern",
+            "expected_proof_level": "L0",
+            "expected_fingerprint": "9b49ee653aa561c2d8f114c2"
           }
         ],
         "negative": [
@@ -242,6 +251,10 @@
           {
             "path": "contract-fixtures/python/sp151-negative-b.py",
             "source_hex": "20756270726f636573732e636865636b5f6f75747075742028207368656c6c203d2054727565"
+          },
+          {
+            "path": "contract-fixtures/python/sp151-negative-c.py",
+            "source_hex": "696d706f72742073756270726f636573730a0a0a6465662063757272656e745f636f6d6d697428293a0a20202020646f6e65203d2073756270726f636573732e72756e285b22676974222c20227265762d7061727365222c202248454144225d2c20636170747572655f6f75747075743d547275652c20636865636b3d46616c73652c20746578743d54727565290a2020202072657475726e20646f6e652e7374646f75742e737472697028290a"
           }
         ],
         "adversarial": [
@@ -282,6 +295,15 @@
             "expected_detection": "pattern",
             "expected_proof_level": "L0",
             "expected_fingerprint": "562e3caa088ebd120fa853db"
+          },
+          {
+            "path": "contract-fixtures/python/sp163-positive-c.py",
+            "source_hex": "636f6e74657874203d2073736c2e756e76657269666965645f636f6e746578745f6372656174696f6e2028290a",
+            "expected_line": 1,
+            "expected_confidence": "high",
+            "expected_detection": "pattern",
+            "expected_proof_level": "L0",
+            "expected_fingerprint": "9c87f93f6baf5ed76be74e21"
           }
         ],
         "negative": [
@@ -292,6 +314,10 @@
           {
             "path": "contract-fixtures/python/sp163-negative-b.py",
             "source_hex": "20736c2e756e76657269666965645f636f6e746578745f6372656174696f6e0928"
+          },
+          {
+            "path": "contract-fixtures/python/sp163-negative-c.py",
+            "source_hex": "696d706f72742073736c0a0a0a646566207365637572655f636f6e7465787428636572745f70617468293a0a2020202072657475726e2073736c2e6372656174655f64656661756c745f636f6e7465787428636166696c653d636572745f70617468290a"
           }
         ],
         "adversarial": [
@@ -332,6 +358,15 @@
             "expected_detection": "pattern",
             "expected_proof_level": "L0",
             "expected_fingerprint": "0490de936656131fbb782d96"
+          },
+          {
+            "path": "contract-fixtures/python/sp164-positive-c.py",
+            "source_hex": "6170702e636f6e6669675b2244454255475f54425f454e41424c4544225d203d20547275650a",
+            "expected_line": 1,
+            "expected_confidence": "high",
+            "expected_detection": "pattern",
+            "expected_proof_level": "L0",
+            "expected_fingerprint": "28db2d0267b42e6aa849dc7a"
           }
         ],
         "negative": [
@@ -342,6 +377,10 @@
           {
             "path": "contract-fixtures/python/sp164-negative-b.py",
             "source_hex": "2065627567546f6f6c626172457874656e73696f6e0928"
+          },
+          {
+            "path": "contract-fixtures/python/sp164-negative-c.py",
+            "source_hex": "66726f6d20666c61736b20696d706f727420466c61736b0a0a617070203d20466c61736b285f5f6e616d655f5f290a6170702e636f6e6669675b2244454255475f54425f454e41424c4544225d203d2046616c73650a"
           }
         ],
         "adversarial": [
@@ -367,12 +406,12 @@
         "positive": [
           {
             "path": "contract-fixtures/python/sp165-positive-a.py",
-            "source_hex": "2e726177202820275a2573",
+            "source_hex": "2e726177202820275a272025",
             "expected_line": 1,
             "expected_confidence": "high",
             "expected_detection": "pattern",
             "expected_proof_level": "L0",
-            "expected_fingerprint": "8cc448e8ccc46e83278ca16a"
+            "expected_fingerprint": "8f50c276c666e1f941a553ba"
           },
           {
             "path": "contract-fixtures/python/sp165-positive-b.py",
@@ -382,22 +421,35 @@
             "expected_detection": "pattern",
             "expected_proof_level": "L0",
             "expected_fingerprint": "78161656675d6ff9a89f2738"
+          },
+          {
+            "path": "contract-fixtures/python/sp165-positive-c.py",
+            "source_hex": "726f7773203d20456e7472792e6f626a656374732e726177282253454c454354202a2046524f4d20656e7472696573205748455245206e616d65203d2027257327222025206e616d65290a",
+            "expected_line": 1,
+            "expected_confidence": "high",
+            "expected_detection": "pattern",
+            "expected_proof_level": "L0",
+            "expected_fingerprint": "bd83517d03f2d7d0cc9607c7"
           }
         ],
         "negative": [
           {
             "path": "contract-fixtures/python/sp165-negative-a.py",
-            "source_hex": "21726177202820275a2573"
+            "source_hex": "21726177202820275a272025"
           },
           {
             "path": "contract-fixtures/python/sp165-negative-b.py",
-            "source_hex": "20726177202820275a2573"
+            "source_hex": "20726177202820275a272025"
+          },
+          {
+            "path": "contract-fixtures/python/sp165-negative-c.py",
+            "source_hex": "646566206765745f656e74727928656e7472795f6964293a0a2020202072657475726e206c69737428456e7472792e6f626a656374732e726177282253454c454354202a2046524f4d20656e7472696573205748455245206964203d202573222c205b656e7472795f69645d29290a"
           }
         ],
         "adversarial": [
           {
             "path": "contract-fixtures/python/sp165-adversarial-a.py",
-            "source_hex": "58726177202820275a2573",
+            "source_hex": "58726177202820275a272025",
             "expected": false,
             "rationale": "A one-boundary near miss preserves most of the suspicious syntax while changing the detector's required token or delimiter; it records the current evasion and false-positive boundary without claiming data-flow reconstruction."
           }

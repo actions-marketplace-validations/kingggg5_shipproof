@@ -3952,6 +3952,24 @@ RULE_EXPLANATIONS: dict[str, dict[str, str]] = {
         "false_positive": "Local development settings legitimately enable DEBUG; the finding targets settings modules that also carry deployment markers such as ALLOWED_HOSTS or production middleware stacks.",
         "test": "Keep DEBUG = False in deployable settings, assert the deployed configuration via a settings-dump management command or deployment smoke test.",
     },
+    "SP666": {
+        "why": "Browser-reported upload MIME metadata is attacker-controlled and cannot establish the actual content type of a file.",
+        "attack": "An attacker labels a script or active document as an allowed image MIME type, bypasses an allowlist, and stores or serves the payload from the application.",
+        "false_positive": "The metadata may be used only for logging or a preliminary UI branch; content validation performed later through finfo or equivalent is outside this narrow line detector.",
+        "test": "Validate the temporary upload contents with finfo or an equivalent content-aware parser, then assert the stored file is served with a safe type and disposition.",
+    },
+    "SP667": {
+        "why": "A sensitive cookie without HttpOnly can be read through document.cookie after an XSS bug and replayed as an authenticated session.",
+        "attack": "An attacker chains a script-injection flaw with a session cookie that omits HttpOnly and exfiltrates the cookie value from the browser.",
+        "false_positive": "The cookie may be deliberately non-sensitive or constructed through a helper that sets HttpOnly later; this rule only reports direct sensitive cookie literals.",
+        "test": "Set HttpOnly: true, Secure: true, and an appropriate SameSite value on sensitive cookies, then assert the emitted Set-Cookie header contains those attributes.",
+    },
+    "SP668": {
+        "why": "Using argv data as a printf-family format string lets format directives read or write process memory and can lead to code execution.",
+        "attack": "An attacker supplies format directives through a command-line argument; the process interprets them instead of treating the argument as ordinary data.",
+        "false_positive": "A validated constant format or a wrapper that passes argv as a data argument is safe; this detector only recognizes direct argv use in the format position.",
+        "test": 'Use a literal format such as "%s" and pass argv as a separate argument; run with format directives and assert no memory disclosure or mutation occurs.',
+    },
     "SP096": {
         "why": "Skill files with instruction injection patterns can hijack agent behavior.",
         "attack": "Attacker crafts a skill file with hidden instructions that override the agent's intended behavior.",
@@ -13029,6 +13047,52 @@ RULES: tuple[Rule, ...] = (
         "CWE-489",
         "OWASP ASVS V14",
         frozenset({".py"}),
+    ),
+    Rule(
+        "SP666",
+        "PHP upload allowlist trusts browser MIME metadata",
+        "security",
+        "medium",
+        "low",
+        compile_pattern(
+            r"""(?:if\s*\([^\n]*\$_FILES\[[^\]]+\]\[['\"]type['\"]\]|in_array\s*\(\s*\$_FILES\[[^\]]+\]\[['\"]type['\"]\])"""
+        ),
+        "A PHP upload decision uses the browser-supplied MIME metadata instead of validating file content.",
+        "Use finfo or content-based validation on the temporary file, then enforce a safe destination and extension policy.",
+        "CWE-434",
+        "OWASP ASVS V5",
+        frozenset({".php"}),
+    ),
+    Rule(
+        "SP667",
+        "Go sensitive cookie without explicit HttpOnly",
+        "security",
+        "medium",
+        "low",
+        re.compile(
+            r"""(?:http\.)?SetCookie\s*\([^,]+,\s*&(?:http\.)?Cookie\s*\{(?=[^}]*Name\s*:\s*[\"'](?:session|auth|token|jwt|refresh)[\"'])(?:(?!HttpOnly\s*:\s*true)[^}])*\}\s*\)""",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "A sensitive Go cookie literal omits an explicit HttpOnly flag, leaving the session value readable by script.",
+        "Set HttpOnly: true together with Secure and an appropriate SameSite policy, or document a deliberate non-sensitive cookie.",
+        "CWE-1004",
+        "OWASP ASVS V3",
+        frozenset({".go"}),
+    ),
+    Rule(
+        "SP668",
+        "C/C++ format string taken directly from argv",
+        "security",
+        "medium",
+        "medium",
+        compile_pattern(
+            r"""(?:(?:printf|syslog)\s*\(\s*argv\s*\[[^\]]+\]|fprintf\s*\(\s*[^,]+,\s*argv\s*\[[^\]]+\]|sprintf\s*\(\s*[^,]+,\s*argv\s*\[[^\]]+\]|snprintf\s*\(\s*[^,]+,\s*[^,]+,\s*argv\s*\[[^\]]+\])"""
+        ),
+        "A C/C++ formatted-output call receives an attacker-controlled argv value as its format string.",
+        'Use a constant format string such as "%s" and pass argv as data; validate command-line inputs before use.',
+        "CWE-134",
+        "CERT C FIO30-C",
+        frozenset({".c", ".cc", ".cpp", ".h", ".hpp"}),
     ),
 )
 

@@ -1,6 +1,6 @@
 # Detection rules reference
 
-ShipProof applies 635 deterministic executable rules (`SP001`-`SP665`, with deliberate reserved gaps). This page is the complete catalog: severity, category, detection method, and the ecosystem mapping that decides where each structural check runs.
+ShipProof applies 638 deterministic executable rules (`SP001`-`SP668`, with deliberate reserved gaps). This page is the complete catalog: severity, category, detection method, and the ecosystem mapping that decides where each structural check runs.
 
 Every finding carries an evidence `proof_level`: `L0` means a pattern match, `L1` means structural evidence (Python AST, whole-file structural analysis, or an inspected artifact such as a SQLite header), and `L2` marks taint-engine flows (the shipped interprocedural engine covers Python and, since 0.8, JavaScript/TypeScript route-to-sink chains via `--cross-file`). ShipProof does not claim runtime exploitability. Only the entries in these tables are executable rules; research catalogs are planning inputs and cannot emit findings.
 
@@ -668,4 +668,7 @@ ShipProof uses file suffixes, manifests, and bounded structural context to selec
 | **`SP663`** | MEDIUM | Security | Django session cookie sent without the Secure flag | Regex |
 | **`SP664`** | MEDIUM | Security | FastAPI app routes without visible rate limiting | Structural |
 | **`SP665`** | MEDIUM | Security | Django settings enable DEBUG in a production settings module | Structural |
+| **`SP666`** | MEDIUM | Security | PHP upload allowlist trusts browser MIME metadata | Regex |
+| **`SP667`** | MEDIUM | Security | Go sensitive cookie without explicit HttpOnly | Regex |
+| **`SP668`** | MEDIUM | Security | C/C++ format string taken directly from argv | Regex |
 

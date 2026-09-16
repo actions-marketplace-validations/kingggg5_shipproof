@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "max_packed_bytes": 500000,
-    "max_unpacked_bytes": 1860000,
+  "max_unpacked_bytes": 1870000,
   "files": [
     ".claude-plugin/plugin.json",
     ".codex-plugin/plugin.json",

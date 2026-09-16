@@ -11,7 +11,7 @@ shipproof help
 
 Use `SHIPPROOF_PYTHON` only when Python is not discoverable as `py -3`, `python3`, or `python`. Set it to an executable path or command name, not a command string with arguments. The detected runtime is probed once per process and shared by every gate.
 
-Policy gates launched by `shipproof check` buffer scanner JSON with a 60 second timeout and a 16 MB output cap. Override with `SHIPPROOF_GATE_TIMEOUT_MS` (minimum 1000) and `SHIPPROOF_MAX_BUFFER_BYTES` (minimum 65536); a timeout, an output overflow, or a scanner crash is always reported as exit `2` (invalid or unavailable evidence), never as a gate block.
+Policy gates launched by `shipproof check` buffer scanner JSON with a 120 second timeout and a 16 MB output cap. Override with `SHIPPROOF_GATE_TIMEOUT_MS` (minimum 1000) and `SHIPPROOF_MAX_BUFFER_BYTES` (minimum 65536); a timeout, an output overflow, or a scanner crash is always reported as exit `2` (invalid or unavailable evidence), never as a gate block.
 
 ## JSON evidence contracts
 

@@ -66,4 +66,4 @@ This wave intentionally adds research records instead of noisy findings. The nex
 - DOTNET-W1-03 is implemented as a scoped extension of existing `SP110`. It recognizes request-derived `Path.Combine` inputs while keeping static asset paths silent.
 - DOTNET-W1-07 is implemented as a scoped extension of existing `SP109`. It recognizes `HttpClient` methods that receive `Request.Query/Form/Headers` values while keeping configured service URLs silent.
 - DOTNET-W1-06 is implemented as a scoped extension of existing `SP121`. It recognizes `Redirect(Request.Query/Form/Headers)` while keeping fixed local redirect targets silent.
-- Both extensions have walker-facing positive/negative tests and regenerated pattern contracts. Severity, gate eligibility, and rule count are unchanged. The remaining 18 records stay research-only until structural evidence exists.
+- All six extensions have walker-facing positive/negative tests and regenerated pattern contracts. Severity, gate eligibility, and rule count are unchanged. The remaining 14 records stay research-only until structural evidence exists.

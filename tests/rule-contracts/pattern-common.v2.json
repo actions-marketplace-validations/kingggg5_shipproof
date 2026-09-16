@@ -130,21 +130,21 @@
         "positive": [
           {
             "path": "contract-fixtures/common/sp103-positive-a.py",
-            "source_hex": "65786563757465092809225a22092b0961",
+            "source_hex": "76617220726573756c74203d2064622e46726f6d53716c52617728242253454c454354202a2046524f4d205573657273205748455245204964203d207b69647d22293b",
             "expected_line": 1,
             "expected_confidence": "medium",
             "expected_detection": "pattern",
             "expected_proof_level": "L0",
-            "expected_fingerprint": "8e8b25eabcaa59d77e9436df"
+            "expected_fingerprint": "67ddabb369426eeafed8e75a"
           },
           {
             "path": "contract-fixtures/common/sp103-positive-b.py",
-            "source_hex": "7261772009282009602020247b3b0a",
+            "source_hex": "76617220726573756c74203d2064622e46726f6d53716c52617728242253454c454354202a2046524f4d205573657273205748455245204964203d207b69647d22293b3b0a",
             "expected_line": 1,
             "expected_confidence": "medium",
             "expected_detection": "pattern",
             "expected_proof_level": "L0",
-            "expected_fingerprint": "f639b086e1a7c1cfff99e42e"
+            "expected_fingerprint": "29cebf07ec3adf6161643322"
           },
           {
             "path": "contract-fixtures/common/sp103-positive-c.py",
@@ -159,11 +159,11 @@
         "negative": [
           {
             "path": "contract-fixtures/common/sp103-negative-a.py",
-            "source_hex": "21786563757465092809225a22092b0961"
+            "source_hex": "76617220726573756c74203d2064622e46726f6d53716c21617728242253454c454354202a2046524f4d205573657273205748455245204964203d207b69647d22293b"
           },
           {
             "path": "contract-fixtures/common/sp103-negative-b.py",
-            "source_hex": "20786563757465092809225a22092b0961"
+            "source_hex": "76617220726573756c74203d2064622e46726f6d53716c20617728242253454c454354202a2046524f4d205573657273205748455245204964203d207b69647d22293b"
           },
           {
             "path": "contract-fixtures/common/sp103-negative-c.py",
@@ -173,7 +173,7 @@
         "adversarial": [
           {
             "path": "contract-fixtures/common/sp103-adversarial-a.py",
-            "source_hex": "58786563757465092809225a22092b0961",
+            "source_hex": "76617220726573756c74203d2064622e46726f6d53716c58617728242253454c454354202a2046524f4d205573657273205748455245204964203d207b69647d22293b",
             "expected": false,
             "rationale": "A one-boundary near miss preserves most of the suspicious syntax while changing the detector's required token or delimiter; it records the current evasion and false-positive boundary without claiming data-flow reconstruction."
           }
@@ -11994,37 +11994,37 @@
         "positive": [
           {
             "path": "contract-fixtures/common/sp624-positive-a.py",
-            "source_hex": "746f6b656e093d0972616e646f6d2e72616e646f6d2829",
+            "source_hex": "66696e616c20746f6b656e203d2052616e646f6d28292e6e657874496e742831303030303030293b",
             "expected_line": 1,
             "expected_confidence": "high",
             "expected_detection": "pattern",
             "expected_proof_level": "L0",
-            "expected_fingerprint": "db43a8104f953addd0fdd282"
+            "expected_fingerprint": "9641cba9cd4f6d57c2141a55"
           },
           {
             "path": "contract-fixtures/common/sp624-positive-b.py",
-            "source_hex": "70617373776f726420093d20094d6174682e72616e646f6d28293b0a",
+            "source_hex": "66696e616c20746f6b656e203d2052616e646f6d28292e6e657874496e742831303030303030293b3b0a",
             "expected_line": 1,
             "expected_confidence": "high",
             "expected_detection": "pattern",
             "expected_proof_level": "L0",
-            "expected_fingerprint": "49303d0adc9f81c3c8c629d2"
+            "expected_fingerprint": "b6f730ec3edcf0f30661ef4e"
           }
         ],
         "negative": [
           {
             "path": "contract-fixtures/common/sp624-negative-a.py",
-            "source_hex": "216f6b656e093d0972616e646f6d2e72616e646f6d2829"
+            "source_hex": "66696e616c20216f6b656e203d2052616e646f6d28292e6e657874496e742831303030303030293b"
           },
           {
             "path": "contract-fixtures/common/sp624-negative-b.py",
-            "source_hex": "206f6b656e093d0972616e646f6d2e72616e646f6d2829"
+            "source_hex": "66696e616c20206f6b656e203d2052616e646f6d28292e6e657874496e742831303030303030293b"
           }
         ],
         "adversarial": [
           {
             "path": "contract-fixtures/common/sp624-adversarial-a.py",
-            "source_hex": "586f6b656e093d0972616e646f6d2e72616e646f6d2829",
+            "source_hex": "66696e616c20586f6b656e203d2052616e646f6d28292e6e657874496e742831303030303030293b",
             "expected": false,
             "rationale": "A one-boundary near miss preserves most of the suspicious syntax while changing the detector's required token or delimiter; it records the current evasion and false-positive boundary without claiming data-flow reconstruction."
           }

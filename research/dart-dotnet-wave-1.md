@@ -57,3 +57,9 @@ Each candidate needs:
 - **No candidate is blocking:** severity and gate eligibility remain unchanged until the promotion gate and representative labels pass.
 
 This wave intentionally adds research records instead of noisy findings. The next promotion slice should implement DART-W1-01 plus one C# structural rule, then measure before selecting the next pair.
+
+## First promotion slice status (2026-09-16)
+
+- DART-W1-01 is implemented as a scoped extension of existing `SP624` rather than a duplicate rule ID. It recognizes security-sensitive Dart names assigned from `Random().nextInt/nextDouble` while keeping UI-animation randomness silent.
+- DOTNET-W1-02 is implemented as a scoped extension of existing `SP103`. It recognizes interpolated C# `FromSqlRaw`/`ExecuteSqlRaw`-style calls while keeping parameterized raw SQL silent.
+- Both extensions have walker-facing positive/negative tests and regenerated pattern contracts. Severity, gate eligibility, and rule count are unchanged. The remaining 18 records stay research-only until structural evidence exists.

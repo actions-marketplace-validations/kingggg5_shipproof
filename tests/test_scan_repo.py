@@ -1876,6 +1876,26 @@ def safe(page_size: int = Query(50, ge=1, le=100)): ...
         findings = self.findings("auth.ts", source)
         self.assertTrue(any(f.rule_id == "SP624" for f in findings))
 
+    def test_sp624_dart_random_for_security_token(self):
+        source = "import 'dart:math';\nfinal token = Random().nextInt(1000000);\n"
+        findings = self.findings("auth.dart", source)
+        self.assertTrue(any(f.rule_id == "SP624" for f in findings))
+
+    def test_sp624_dart_random_for_ui_is_not_flagged(self):
+        source = "import 'dart:math';\nfinal angle = Random().nextDouble();\n"
+        findings = self.findings("animation.dart", source)
+        self.assertFalse(any(f.rule_id == "SP624" for f in findings))
+
+    def test_sp103_csharp_raw_sql_interpolation_is_flagged(self):
+        source = 'var rows = db.FromSqlRaw($"SELECT * FROM Users WHERE Id = {id}");\n'
+        findings = self.findings("Users.cs", source)
+        self.assertTrue(any(f.rule_id == "SP103" for f in findings))
+
+    def test_sp103_csharp_parameterized_raw_sql_is_not_flagged(self):
+        source = 'var rows = db.FromSqlRaw("SELECT * FROM Users WHERE Id = @id", id);\n'
+        findings = self.findings("Users.cs", source)
+        self.assertFalse(any(f.rule_id == "SP103" for f in findings))
+
     def test_sp625_csharp_unawaited_task_run(self):
         source = (
             "public async Task<IActionResult> PostHandler() {\n    "

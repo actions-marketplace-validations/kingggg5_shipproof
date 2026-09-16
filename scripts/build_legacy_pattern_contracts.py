@@ -48,6 +48,8 @@ MANUAL_WITNESSES = {
     "SP332": "go func() { ch <- value // unbuffered\n}()",
     "SP371": "for i, item := range items {\n    go func() { use(item) }\n}",
     "SP592": "const body = (await req.json()) as any",
+    "SP103": "".join(("var result = db.FromSqlRaw($", '"SELECT * FROM Users WHERE Id = {id}"', ");")),
+    "SP624": "".join(("final token = Random().nextInt(", "1000000);") ),
 }
 
 # Q03 cohort 1: human-reviewed realistic safe counterparts. Each source is

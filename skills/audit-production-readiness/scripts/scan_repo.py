@@ -5758,7 +5758,7 @@ RULES: tuple[Rule, ...] = (
         "high",
         "medium",
         compile_pattern(
-            r"""(?:execute|query|raw)\s*\(\s*(?:f["']|`[^`]*\$\{|["'][^"']*["']\s*%|[^,\x0a]{0,512}\.format\(|["'][^"']*["']\s*\+\s*(?:[A-Za-z_$]|["']))"""
+            r"""(?:execute|query|raw)\s*\(\s*(?:f["']|\$["'][^"']*\{|`[^`]*\$\{|["'][^"']*["']\s*%|[^,\x0a]{0,512}\.format\(|["'][^"']*["']\s*\+\s*(?:[A-Za-z_$]|["']))"""
         ),
         "A database query appears to be built with string interpolation.",
         "Use parameterized queries or the ORM's bound parameters and add an injection regression test.",
@@ -12455,13 +12455,13 @@ RULES: tuple[Rule, ...] = (
         "high",
         "high",
         compile_pattern(
-            r"""(?:token|secret|password|key|reset_code)\s*=\s*(?:Math\.random\(\)|random\.random\(\)|rand\.Intn\()"""
+            r"""(?:token|secret|password|key|reset[_-]?code|otp)\s*[:=]\s*(?:Math\.random\(\)|random\.random\(\)|rand\.Intn\(|Random\(\)\.(?:nextInt|nextDouble)\s*\()"""
         ),
         "Using non-cryptographic PRNGs (Math.random(), random.random()) for security tokens makes them predictable and forgeable.",
         "Use cryptographically secure random generators: crypto.randomBytes() or secrets.token_hex().",
         "CWE-327",
         "OWASP ASVS V6",
-        frozenset({".js", ".ts", ".py", ".go", ".java", ".cs", ".php"}),
+        frozenset({".js", ".ts", ".py", ".go", ".java", ".cs", ".php", ".dart"}),
     ),
     Rule(
         "SP625",

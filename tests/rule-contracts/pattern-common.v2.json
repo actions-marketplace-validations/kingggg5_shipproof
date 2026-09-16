@@ -202,12 +202,12 @@
           },
           {
             "path": "contract-fixtures/common/sp104-positive-b.py",
-            "source_hex": "626164436572746966696361746543616c6c6261636b09203d09202820202909203d3e2009747275653b0a",
+            "source_hex": "5365727665724365727469666963617465437573746f6d56616c69646174696f6e43616c6c6261636b20093d200948747470436c69656e7448616e646c65722e44616e6765726f7573416363657074416e79536572766572436572746966696361746556616c696461746f723b0a",
             "expected_line": 1,
             "expected_confidence": "high",
             "expected_detection": "pattern",
             "expected_proof_level": "L0",
-            "expected_fingerprint": "2bb51e8265aa81268cfe25ba"
+            "expected_fingerprint": "0a51f23c52dc6df016da75ab"
           },
           {
             "path": "contract-fixtures/common/sp104-positive-c.py",
@@ -805,28 +805,28 @@
         "positive": [
           {
             "path": "contract-fixtures/common/sp121-positive-a.py",
-            "source_hex": "7265646972656374202820726571092e",
+            "source_hex": "726564697265637450726573657276654d6574686f6409280972657175657374202e",
             "expected_line": 1,
             "expected_confidence": "medium",
             "expected_detection": "pattern",
             "expected_proof_level": "L0",
-            "expected_fingerprint": "e8b37a1a69899e003e1dda01"
+            "expected_fingerprint": "54c457d5727b7068134513b0"
           }
         ],
         "negative": [
           {
             "path": "contract-fixtures/common/sp121-negative-a.py",
-            "source_hex": "2165646972656374202820726571092e"
+            "source_hex": "216564697265637450726573657276654d6574686f6409280972657175657374202e"
           },
           {
             "path": "contract-fixtures/common/sp121-negative-b.py",
-            "source_hex": "2065646972656374202820726571092e"
+            "source_hex": "206564697265637450726573657276654d6574686f6409280972657175657374202e"
           }
         ],
         "adversarial": [
           {
             "path": "contract-fixtures/common/sp121-adversarial-a.py",
-            "source_hex": "5865646972656374202820726571092e",
+            "source_hex": "586564697265637450726573657276654d6574686f6409280972657175657374202e",
             "expected": false,
             "rationale": "A one-boundary near miss preserves most of the suspicious syntax while changing the detector's required token or delimiter; it records the current evasion and false-positive boundary without claiming data-flow reconstruction."
           }

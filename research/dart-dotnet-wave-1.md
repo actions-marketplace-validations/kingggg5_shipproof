@@ -68,3 +68,13 @@ This wave intentionally adds research records instead of noisy findings. The nex
 - DOTNET-W1-07 is implemented as a scoped extension of existing `SP109`. It recognizes `HttpClient` methods that receive `Request.Query/Form/Headers` values while keeping configured service URLs silent.
 - DOTNET-W1-06 is implemented as a scoped extension of existing `SP121`. It recognizes `Redirect(Request.Query/Form/Headers)` while keeping fixed local redirect targets silent.
 - All six extensions have walker-facing positive/negative tests and regenerated pattern contracts. Severity, gate eligibility, and rule count are unchanged. The remaining 14 records stay research-only until structural evidence exists.
+
+## Wave 2 scoped extensions (2026-09-16)
+
+- `SP104` now also recognizes C# `ServerCertificateCustomValidationCallback` unconditional acceptance and Dart `SecurityContext(withTrustedRoots: false)`; pinned callbacks and trusted roots stay silent.
+- `SP109` now recognizes C# `HttpRequestMessage` targets built directly from `Request.Query/Form/Headers`; configured service URLs stay silent.
+- `SP121` now recognizes C# `RedirectPermanent`, `RedirectPreserveMethod`, and `Results.Redirect` request targets; constant local destinations stay silent.
+
+These are extensions of existing root causes, not duplicate IDs. They are covered
+by walker-facing regression tests and remain subject to the same precision and
+representative-repository gate as the research catalog.

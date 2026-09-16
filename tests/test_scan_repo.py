@@ -1906,6 +1906,26 @@ def safe(page_size: int = Query(50, ge=1, le=100)): ...
         findings = self.findings("client.dart", source)
         self.assertFalse(any(f.rule_id == "SP104" for f in findings))
 
+    def test_sp104_csharp_server_certificate_callback_is_flagged(self):
+        source = "handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;\n"
+        findings = self.findings("Http.cs", source)
+        self.assertTrue(any(f.rule_id == "SP104" for f in findings))
+
+    def test_sp104_csharp_pinned_certificate_callback_is_not_flagged(self):
+        source = "handler.ServerCertificateCustomValidationCallback = ValidatePinnedCertificate;\n"
+        findings = self.findings("Http.cs", source)
+        self.assertFalse(any(f.rule_id == "SP104" for f in findings))
+
+    def test_sp104_dart_trust_roots_disabled_is_flagged(self):
+        source = "final context = SecurityContext(withTrustedRoots: false);\n"
+        findings = self.findings("tls.dart", source)
+        self.assertTrue(any(f.rule_id == "SP104" for f in findings))
+
+    def test_sp104_dart_trust_roots_enabled_is_not_flagged(self):
+        source = "final context = SecurityContext(withTrustedRoots: true);\n"
+        findings = self.findings("tls.dart", source)
+        self.assertFalse(any(f.rule_id == "SP104" for f in findings))
+
     def test_sp110_csharp_request_path_combine_is_flagged(self):
         source = 'var path = Path.Combine(root, Request.Query["file"]);\nreturn PhysicalFile(path, contentType);\n'
         findings = self.findings("Files.cs", source)
@@ -1926,6 +1946,18 @@ def safe(page_size: int = Query(50, ge=1, le=100)): ...
         findings = self.findings("Proxy.cs", source)
         self.assertFalse(any(f.rule_id == "SP109" for f in findings))
 
+    def test_sp109_csharp_request_message_url_is_flagged(self):
+        source = 'var request = new HttpRequestMessage(HttpMethod.Get, Request.Query["url"]);\n'
+        findings = self.findings("Proxy.cs", source)
+        self.assertTrue(any(f.rule_id == "SP109" for f in findings))
+
+    def test_sp109_csharp_configured_request_message_url_is_not_flagged(self):
+        source = (
+            'var request = new HttpRequestMessage(HttpMethod.Get, configuration["DirectoryUrl"]);\n'
+        )
+        findings = self.findings("Proxy.cs", source)
+        self.assertFalse(any(f.rule_id == "SP109" for f in findings))
+
     def test_sp121_csharp_request_redirect_is_flagged(self):
         source = 'return Redirect(Request.Query["next"]);\n'
         findings = self.findings("LoginController.cs", source)
@@ -1933,6 +1965,21 @@ def safe(page_size: int = Query(50, ge=1, le=100)): ...
 
     def test_sp121_csharp_local_constant_redirect_is_not_flagged(self):
         source = 'return Redirect("/dashboard");\n'
+        findings = self.findings("LoginController.cs", source)
+        self.assertFalse(any(f.rule_id == "SP121" for f in findings))
+
+    def test_sp121_csharp_permanent_request_redirect_is_flagged(self):
+        source = 'return RedirectPermanent(Request.Query["next"]);\n'
+        findings = self.findings("LoginController.cs", source)
+        self.assertTrue(any(f.rule_id == "SP121" for f in findings))
+
+    def test_sp121_csharp_results_request_redirect_is_flagged(self):
+        source = 'return Results.Redirect(Request.Query["next"]);\n'
+        findings = self.findings("LoginController.cs", source)
+        self.assertTrue(any(f.rule_id == "SP121" for f in findings))
+
+    def test_sp121_csharp_permanent_constant_redirect_is_not_flagged(self):
+        source = 'return RedirectPermanent("/dashboard");\n'
         findings = self.findings("LoginController.cs", source)
         self.assertFalse(any(f.rule_id == "SP121" for f in findings))
 

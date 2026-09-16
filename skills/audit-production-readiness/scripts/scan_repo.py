@@ -3970,6 +3970,18 @@ RULE_EXPLANATIONS: dict[str, dict[str, str]] = {
         "false_positive": "A validated constant format or a wrapper that passes argv as a data argument is safe; this detector only recognizes direct argv use in the format position.",
         "test": 'Use a literal format such as "%s" and pass argv as a separate argument; run with format directives and assert no memory disclosure or mutation occurs.',
     },
+    "SP669": {
+        "why": "SharedPreferences is a plain preference store and is not an appropriate protection boundary for reusable credentials or bearer tokens.",
+        "attack": "An attacker with device backup, filesystem, or local inspection access reads a token stored in preferences and replays it against the service.",
+        "false_positive": "A token-like preference may be a non-secret demo value or an intentionally short-lived test fixture; encrypted storage wrappers and non-sensitive settings stay silent.",
+        "test": "Store credentials in platform-backed secure storage, rotate any exposed token, and assert that preference files contain no reusable authentication material.",
+    },
+    "SP670": {
+        "why": "Enabling XML DTD processing or an external resolver lets untrusted XML resolve external entities and access local or remote resources.",
+        "attack": "An attacker submits XML containing an external entity; the parser dereferences it and discloses local files or performs an internal network request.",
+        "false_positive": "Trusted offline XML with a reviewed DTD may require this setting, but request-facing parsers should use Prohibit or Ignore and a null resolver.",
+        "test": "Set DtdProcessing to Prohibit or Ignore, set XmlResolver to null, and add an XXE regression payload that must not read files or make network requests.",
+    },
     "SP096": {
         "why": "Skill files with instruction injection patterns can hijack agent behavior.",
         "attack": "Attacker crafts a skill file with hidden instructions that override the agent's intended behavior.",
@@ -5791,7 +5803,7 @@ RULES: tuple[Rule, ...] = (
         "high",
         "high",
         compile_pattern(
-            r"""(?:\b(?:verify|rejectUnauthorized)\s*[:=]\s*(?:false|False)\b|\bbadCertificateCallback\s*=\s*\([^)]*\)\s*=>\s*true\b)"""
+            r"""(?:\b(?:verify|rejectUnauthorized)\s*[:=]\s*(?:false|False)\b|\bbadCertificateCallback\s*=\s*\([^)]*\)\s*=>\s*true\b|\bServerCertificateCustomValidationCallback\s*=\s*\([^)]*\)\s*=>\s*true\b|\bServerCertificateCustomValidationCallback\s*=\s*HttpClientHandler\.DangerousAcceptAnyServerCertificateValidator\b|\bSecurityContext\s*\(\s*withTrustedRoots\s*:\s*false\b)"""
         ),
         "TLS peer verification is explicitly disabled.",
         "Restore certificate verification and configure the correct trust chain.",
@@ -5862,7 +5874,7 @@ RULES: tuple[Rule, ...] = (
         "high",
         "medium",
         compile_pattern(
-            r"""(?:(?:get|post|put|delete|request|head)\s*\(\s*["'`]https?://(?:169\.254\.169\.254|metadata\.google\.internal|127\.0\.0\.1|localhost)|(?:requests|httpx|fetch|axios|http)\.(?:get|post|put|delete|request)\s*\(\s*(?:req\.query|request\.args|req\.body|user_url|user_input)\b|(?:httpClient|_?client)\.(?:GetAsync|GetStringAsync|PostAsync|SendAsync)\s*\(\s*(?:Request|request)\.(?:Query|Form|Headers)\b)"""
+            r"""(?:(?:get|post|put|delete|request|head)\s*\(\s*["'`]https?://(?:169\.254\.169\.254|metadata\.google\.internal|127\.0\.0\.1|localhost)|(?:requests|httpx|fetch|axios|http)\.(?:get|post|put|delete|request)\s*\(\s*(?:req\.query|request\.args|req\.body|user_url|user_input)\b|(?:httpClient|_?client)\.(?:GetAsync|GetStringAsync|PostAsync|SendAsync)\s*\(\s*(?:Request|request)\.(?:Query|Form|Headers)\b|\bnew\s+HttpRequestMessage\s*\([^,]+,\s*(?:Request|request)\.(?:Query|Form|Headers)\b)"""
         ),
         "An outbound HTTP request may target internal endpoints, localhost, or cloud metadata.",
         "Validate destination URLs against an allowlist and block private IP ranges.",
@@ -6030,7 +6042,7 @@ RULES: tuple[Rule, ...] = (
         "medium",
         "medium",
         compile_pattern(
-            r"""(?:redirect\s*\(\s*(?:req|request)\s*\.|Redirect\s*\(\s*(?:Request|request)\.(?:Query|Form|Headers)\b)"""
+            r"""(?:redirect(?:Permanent|PreserveMethod)?\s*\(\s*(?:req|request)\s*\.|Redirect(?:Permanent|PreserveMethod)?\s*\(\s*(?:Request|request)\.(?:Query|Form|Headers)\b|Results\.Redirect\s*\(\s*(?:Request|request)\.(?:Query|Form|Headers)\b)"""
         ),
         "A redirect target is taken directly from request input, enabling open-redirect phishing attacks.",
         "Redirect only to validated allowlisted paths or relative URLs.",
@@ -13093,6 +13105,36 @@ RULES: tuple[Rule, ...] = (
         "CWE-134",
         "CERT C FIO30-C",
         frozenset({".c", ".cc", ".cpp", ".h", ".hpp"}),
+    ),
+    Rule(
+        "SP669",
+        "Dart credential stored in SharedPreferences",
+        "security",
+        "medium",
+        "low",
+        compile_pattern(
+            r"""(?:SharedPreferences|\bprefs\b)\s*\.\s*setString\s*\(\s*["'](?:token|access[_-]?token|refresh[_-]?token|password|secret|api[_-]?key)["']"""
+        ),
+        "A Dart preference write stores a credential-like value in SharedPreferences, which is not a secure secret store.",
+        "Use platform secure storage or an approved encrypted vault for credentials and tokens; keep preferences for non-sensitive settings.",
+        "CWE-922",
+        "OWASP ASVS V6",
+        frozenset({".dart"}),
+    ),
+    Rule(
+        "SP670",
+        "C# XML parser enables DTD or external resolution",
+        "security",
+        "medium",
+        "low",
+        compile_pattern(
+            r"""(?:DtdProcessing\s*=\s*DtdProcessing\.Parse|XmlResolver\s*=\s*new\s+(?:XmlUrlResolver|XmlSecureResolver))"""
+        ),
+        "A C# XML parser configuration enables DTD processing or an external resolver, creating an XXE risk for untrusted XML.",
+        "Use DtdProcessing.Prohibit or Ignore, set XmlResolver to null, and parse untrusted XML with bounded input and explicit types.",
+        "CWE-611",
+        "OWASP ASVS V5",
+        frozenset({".cs"}),
     ),
 )
 

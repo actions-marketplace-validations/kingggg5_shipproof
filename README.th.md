@@ -65,13 +65,13 @@ Node.js 20+ ทำหน้าที่ CLI ส่วน Python 3.10+ จำเ�
 
 ## ขอบเขตและสถานะโครงการ
 
-ShipProof บังคับ review contract เดียวกันไม่ว่าใครเขียนโค้ด executable scanner ปัจจุบันมี **638 deterministic rules** สำหรับ security, correctness, scale, performance, configuration และ supply-chain risk ที่สังเกตได้ locally path เริ่มต้นเป็น read-only, offline และไม่มี dependency เกิน Node.js กับ Python standard library
+ShipProof บังคับ review contract เดียวกันไม่ว่าใครเขียนโค้ด executable scanner ปัจจุบันมี **640 deterministic rules** สำหรับ security, correctness, scale, performance, configuration และ supply-chain risk ที่สังเกตได้ locally path เริ่มต้นเป็น read-only, offline และไม่มี dependency เกิน Node.js กับ Python standard library
 
 | หัวข้อ | Contract ปัจจุบัน |
 | :--- | :--- |
 | Release ล่าสุด | `v0.11.2` reviewed release |
 | Runtime | Node.js 20+; Python 3.10+ สำหรับคำสั่ง scanner-backed |
-| Executable rules | 638 (`SP001`–`SP668`, มีช่องว่างสงวนไว้ตั้งใจ) |
+| Executable rules | 640 (`SP001`–`SP670`, มีช่องว่างสงวนไว้ตั้งใจ) |
 | Evidence levels | `L0` pattern, `L1` structural/artifact, `L2` interprocedural taint (`--cross-file`; Python + JavaScript/TypeScript) |
 | Research inventory | 7,800 catalogued candidates และ reserved promotion slots 1,000 รายการ; ไม่มีอะไรเป็น finding จนกว่าจะ promote |
 | Exit codes | `0` ผ่าน, `1` gate fail, `2` evidence ไม่ถูกต้อง/ไม่พร้อม |
@@ -139,7 +139,7 @@ shipproof labs impact src/app.py   # blast radius แบบ experimental ก่�
 
 ## กฎการตรวจจับ
 
-**638 deterministic executable rules** (`SP001`–`SP668`, มีช่องสงวนไว้ตั้งใจ) ครอบคลุม security, correctness, scale, performance, configuration และ supply-chain risks ทุก finding มี evidence `proof_level`: `L0` pattern match, `L1` structural/AST/artifact และ `L2` interprocedural taint flows (`--cross-file`; Python plus JavaScript/TypeScript route-to-sink chains ตั้งแต่ v0.8)
+**640 deterministic executable rules** (`SP001`–`SP670`, มีช่องสงวนไว้ตั้งใจ) ครอบคลุม security, correctness, scale, performance, configuration และ supply-chain risks ทุก finding มี evidence `proof_level`: `L0` pattern match, `L1` structural/AST/artifact และ `L2` interprocedural taint flows (`--cross-file`; Python plus JavaScript/TypeScript route-to-sink chains ตั้งแต่ v0.8)
 
 catalog ฉบับเต็ม, severity, category และวิธี detection ต่อกฎ พร้อม mapping ecosystem/framework ที่กำหนดว่า structural check แต่ละตัวรันที่ไหน: อยู่ที่ **[docs/rules.md](docs/rules.md)**
 
@@ -274,7 +274,7 @@ candidate จาก research จะกลายเป็น executable `SPxxx` r
 | [Expert candidate catalog](docs/rule-expansion-1000.md) | 1,000 hypotheses จาก model-assisted mapped กับ source | ไม่มี |
 | [2021–2026 annual catalog](docs/rule-expansion-2021-2026.md) | 1,800 CVE/CWE/community signals | ไม่มี |
 | [Language catalog](docs/rule-expansion-languages-5000.md) | 5,000 research slots แยก ecosystem/CWE | ไม่มี |
-| [Executable rule table](docs/rules.md#detection-rules-reference) | 638 detectors ผ่าน review | Emit versioned findings |
+| [Executable rule table](docs/rules.md#detection-rules-reference) | 640 detectors ผ่าน review | Emit versioned findings |
 
 ดู [production playbook](docs/production-playbook.md), [development plan](https://github.com/kingggg5/shipproof/blob/main/docs/next-development-plan.md) และ [delivery roadmap](docs/roadmap.md) สำหรับขอบเขต operational และ acceptance gates อ้างอิง release ด้วย [CITATION.cff](CITATION.cff)
 

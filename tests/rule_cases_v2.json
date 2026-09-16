@@ -1206,6 +1206,140 @@
           "rationale": "Pointer arithmetic needs semantic analysis and is outside this direct-index signature; it must not be guessed as a format-string finding."
         }
       ]
+    },
+    {
+      "rule_id": "SP669",
+      "expected_severity": "medium",
+      "expected_confidence": "low",
+      "blocking_eligible": false,
+      "sources": [
+        {
+          "url": "https://pub.dev/packages/shared_preferences",
+          "claim": "The shared_preferences package provides ordinary key-value persistence and is not documented as a secure credential vault for secrets or bearer tokens."
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/922.html",
+          "claim": "CWE-922 covers sensitive data stored without adequate protection and the resulting disclosure through local storage or backups."
+        }
+      ],
+      "false_positive_analysis": "The rule requires a literal sensitive key in a setString call on SharedPreferences or a conventional prefs variable and only runs on Dart files. Theme settings, encrypted-storage wrappers, getString reads, computed keys, and non-sensitive preference names stay silent. A demo token may still be benign, so this first implementation is advisory and must be reviewed against the device threat model.",
+      "positive": [
+        {
+          "path": "auth.dart",
+          "source": "final prefs = await SharedPreferences.getInstance();\nawait prefs.setString('token', accessToken);"
+        },
+        {
+          "path": "session.dart",
+          "source": "final prefs = await SharedPreferences.getInstance();\nawait prefs.setString(\"refresh_token\", refreshToken);"
+        },
+        {
+          "path": "credentials.dart",
+          "source": "final prefs = await SharedPreferences.getInstance();\nawait prefs.setString('password', password);"
+        }
+      ],
+      "negative": [
+        {
+          "path": "settings.dart",
+          "source": "final prefs = await SharedPreferences.getInstance();\nawait prefs.setBool('dark_mode', enabled);"
+        },
+        {
+          "path": "secure.dart",
+          "source": "final storage = const FlutterSecureStorage();\nawait storage.write(key: 'token', value: accessToken);"
+        },
+        {
+          "path": "read.dart",
+          "source": "final token = prefs.getString('token');"
+        },
+        {
+          "path": "prefs.dart",
+          "source": "await preferences.setString('locale', 'th');"
+        },
+        {
+          "path": "keys.dart",
+          "source": "final key = credentialKey;\nawait prefs.setString(key, value);"
+        }
+      ],
+      "adversarial": [
+        {
+          "path": "auth.dart",
+          "source": "final prefs = await SharedPreferences.getInstance();\nawait prefs.setString('api_key_name', label);",
+          "expected": false,
+          "rationale": "A key name that merely contains api_key as part of a non-secret label is not one of the bounded credential literals."
+        },
+        {
+          "path": "auth.dart",
+          "source": "final securePrefs = EncryptedPreferences();\nawait securePrefs.setString('token', accessToken);",
+          "expected": false,
+          "rationale": "An encrypted wrapper is intentionally outside the SharedPreferences signature and must remain silent."
+        }
+      ]
+    },
+    {
+      "rule_id": "SP670",
+      "expected_severity": "medium",
+      "expected_confidence": "low",
+      "blocking_eligible": false,
+      "sources": [
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/migrate-from-xml",
+          "claim": "Microsoft's XML guidance treats external entities and resolver configuration as security-sensitive parser behavior that must be explicitly controlled."
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/611.html",
+          "claim": "CWE-611 covers XML external entity resolution and the disclosure or network access caused by unsafe parser settings."
+        }
+      ],
+      "false_positive_analysis": "The rule only recognizes direct DtdProcessing.Parse or construction of XmlUrlResolver/XmlSecureResolver in C# configuration. Prohibit, Ignore, null resolvers, JSON parsing, and helper-returned settings stay silent. Trusted offline XML may intentionally use DTDs, so the advisory finding requires deployment and input-flow review.",
+      "positive": [
+        {
+          "path": "XmlParser.cs",
+          "source": "var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Parse };\nusing var reader = XmlReader.Create(stream, settings);"
+        },
+        {
+          "path": "XmlParser.cs",
+          "source": "var settings = new XmlReaderSettings();\nsettings.XmlResolver = new XmlUrlResolver();"
+        },
+        {
+          "path": "XmlParser.cs",
+          "source": "var settings = new XmlReaderSettings { XmlResolver = new XmlSecureResolver(new XmlUrlResolver(), credential) };"
+        }
+      ],
+      "negative": [
+        {
+          "path": "XmlParser.cs",
+          "source": "var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null };"
+        },
+        {
+          "path": "XmlParser.cs",
+          "source": "var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore };"
+        },
+        {
+          "path": "JsonParser.cs",
+          "source": "var payload = JsonSerializer.Deserialize<Model>(body);"
+        },
+        {
+          "path": "XmlParser.cs",
+          "source": "var settings = CreateHardenedSettings();\nusing var reader = XmlReader.Create(stream, settings);"
+        },
+        {
+          "path": "XmlParser.cs",
+          "source": "var settings = new XmlReaderSettings { XmlResolver = null };"
+        }
+      ],
+      "adversarial": [
+        {
+          "path": "XmlParser.cs",
+          "source": "var mode = DtdProcessing.ParseMode;\nvar settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit };",
+          "expected": false,
+          "rationale": "A similarly named enum or identifier is not an assignment enabling DTD processing and must not be treated as parser configuration."
+        },
+        {
+          "path": "XmlParser.cs",
+          "source": "var resolver = new MyXmlUrlResolverFactory().Create();\nsettings.XmlResolver = resolver;",
+          "expected": false,
+          "rationale": "Computed resolver flow requires semantic analysis; the narrow rule stays silent rather than guessing that the custom resolver is unsafe."
+        }
+      ]
     }
   ]
 }

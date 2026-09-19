@@ -1,6 +1,6 @@
 {
   "name": "@kingggg5/shipproof",
-  "version": "0.10.0",
+  "version": "0.11.2",
   "description": "Zero-dependency production gate, resource budget, and capacity model for AI-assisted code",
   "type": "module",
   "bin": {
@@ -16,6 +16,10 @@
     "docs",
     "!docs/assets/shipproof-logo.svg",
     "!docs/assets/shipproof-workflow.png",
+    "!docs/precision-plan.md",
+    "!docs/next-development-plan.md",
+    "!schemas/comment-anchor.schema.json",
+    "!schemas/triage-assessment.schema.json",
     "examples/capacity/*.js",
     "examples/capacity/*.json",
     "examples/demo-api/README.md",
@@ -37,6 +41,9 @@
     "!skills/audit-production-readiness/scripts/analysis.py",
     "!skills/audit-production-readiness/scripts/future_phases.py",
     "!skills/audit-production-readiness/scripts/ir.py",
+    "!skills/audit-production-readiness/scripts/comment_anchors.py",
+    "!skills/audit-production-readiness/scripts/rule_search.py",
+    "!skills/audit-production-readiness/scripts/triage_trail.py",
     "skills/engineer-production-systems/SKILL.md",
     "skills/engineer-production-systems/agents",
     "skills/engineer-production-systems/references",
@@ -57,7 +64,7 @@
     "benchmark:scanner": "python scripts/benchmark-scanner.py --files 1000",
     "check": "npm run lint && npm run test && npm run pack:check && npm run test:package",
     "lint": "npm run lint:node && npm run lint:python",
-    "lint:node": "node --check bin/shipproof.mjs && node --check lib/cli.mjs && node --check lib/evidence.mjs && node --check lib/mcp-server.mjs && node --check lib/package-info.mjs && node --check lib/policy.mjs && node --check lib/runtime.mjs && node --check lib/safe-path.mjs && node --check scripts/check-package-manifest.mjs && node --check scripts/release-info.mjs && node --check scripts/run-action.mjs && node --check scripts/package-smoke.mjs && node --check tests/node/cli.test.mjs && node --check tests/node/platform.test.mjs && node --check tests/node/policy.test.mjs && node --check tests/node/golden-parity.test.mjs && node --check tests/node/command-contracts.test.mjs && node --check tests/node/k6-determinism.test.mjs && node --check tests/node/e2e.test.mjs && node --check tests/node/mcp-handshake.test.mjs && node --check tests/node/package-manifest.test.mjs && node --check tests/node/hardening.test.mjs",
+    "lint:node": "node --check bin/shipproof.mjs && node --check lib/cli.mjs && node --check lib/evidence.mjs && node --check lib/executable.mjs && node --check lib/mcp-server.mjs && node --check lib/package-info.mjs && node --check lib/policy.mjs && node --check lib/runtime.mjs && node --check lib/safe-path.mjs && node --check scripts/check-package-manifest.mjs && node --check scripts/release-info.mjs && node --check scripts/run-action.mjs && node --check scripts/package-smoke.mjs && node --check tests/node/cli.test.mjs && node --check tests/node/platform.test.mjs && node --check tests/node/policy.test.mjs && node --check tests/node/golden-parity.test.mjs && node --check tests/node/command-contracts.test.mjs && node --check tests/node/k6-determinism.test.mjs && node --check tests/node/e2e.test.mjs && node --check tests/node/mcp-handshake.test.mjs && node --check tests/node/package-manifest.test.mjs && node --check tests/node/hardening.test.mjs",
     "lint:python": "ruff check . && ruff format --check .",
     "pack:check": "node scripts/check-package-manifest.mjs",
     "test": "npm run test:node && npm run test:python",
@@ -72,7 +79,7 @@
     "node": ">=20"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "zod": "3.25.76"
   },
   "peerDependenciesMeta": {
@@ -84,8 +91,13 @@
     }
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "zod": "3.25.76"
+  },
+  "overrides": {
+    "fast-uri": "3.1.6",
+    "hono": "4.13.8",
+    "qs": "6.16.0"
   },
   "publishConfig": {
     "access": "public",

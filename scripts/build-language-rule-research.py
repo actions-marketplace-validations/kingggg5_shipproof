@@ -11,6 +11,7 @@ import argparse
 import json
 import re
 import runpy
+import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import date
@@ -318,6 +319,9 @@ def applicability(record: dict[str, Any], ecosystem: str) -> tuple[int, list[str
 
 
 def load_existing_rules(scanner_path: Path) -> tuple[list[ExistingRule], str]:
+    scripts_directory = str(scanner_path.resolve().parent)
+    if scripts_directory not in sys.path:
+        sys.path.insert(0, scripts_directory)
     namespace = runpy.run_path(str(scanner_path))
     rules = namespace["RULES"]
     existing = [

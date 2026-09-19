@@ -240,5 +240,23 @@ test("policy check passes on the repository's own reviewed policy", () => {
 });
 
 test("bare shipproof invocation scans the current directory", () => {
-  assert.equal(runCli([]), 0);
+  assert.equal(runCli(["scan", "--allow-incomplete"]), 0);
+});
+
+test("scan runtime discovery is scoped to its target path", () => {
+  const root = mkdtempSync(join(tmpdir(), "shipproof-scan-target-"));
+  try {
+    const canonical = (path) => realpathSync.native(path);
+    assert.equal(canonical(internals.resolveScanRoot([root, "--format", "json"])), canonical(root));
+    assert.equal(
+      canonical(internals.resolveScanRoot(["--snippet", "const root = 'not-a-path'", root, "--allow-incomplete"])),
+      canonical(root),
+    );
+    assert.equal(
+      canonical(internals.resolveScanRoot(["--snippet-file", "fixture.py", "--snippet", "print(1)"])),
+      canonical(process.cwd()),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

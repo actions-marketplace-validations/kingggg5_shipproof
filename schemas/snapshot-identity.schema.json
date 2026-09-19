@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kingggg5/shipproof/schemas/snapshot-identity.schema.json",
+  "title": "ShipProof snapshot identity (evidence reuse contract)",
+  "description": "Versioned canonical identity over relative paths, file bytes, selection, dependency context, scanner/rules identity, and secret-free effective policy. Absolute install paths are never part of identity.",
+  "type": "object",
+  "required": [
+    "identity_version",
+    "root_kind",
+    "policy_digest",
+    "config_digest",
+    "selection_digest",
+    "target_digest",
+    "files"
+  ],
+  "properties": {
+    "identity_version": { "const": "snapshot-identity/1.0" },
+    "root_kind": { "enum": ["git", "workspace"] },
+    "commit": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
+    "scanner_version": { "type": "string", "minLength": 1 },
+    "rules_identity": { "type": "string", "minLength": 1 },
+    "policy_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "config_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "selection_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "target_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "file_count": { "type": "integer", "minimum": 0 },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "size", "sha256"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "size": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

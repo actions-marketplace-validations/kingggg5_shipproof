@@ -44,9 +44,154 @@ MANUAL_WITNESSES = {
     "SP212": "run: printenv",
     "SP274": "process.env.API_KEY",
     "SP275": 'server.registerTool("run", { inputSchema: z.any() }, handler)',
+    "SP282": "ollama pull models.example.test/team/model:latest",
     "SP332": "go func() { ch <- value // unbuffered\n}()",
     "SP371": "for i, item := range items {\n    go func() { use(item) }\n}",
     "SP592": "const body = (await req.json()) as any",
+    "SP103": "".join(
+        ("var result = db.FromSqlRaw($", '"SELECT * FROM Users WHERE Id = {id}"', ");")
+    ),
+    "SP624": "".join(("final token = Random().nextInt(", "1000000);")),
+}
+
+# Q03 cohort 1: human-reviewed realistic safe counterparts. Each source is
+# production-shaped code that must stay silent; the builder fails closed if
+# any of them ever matches its rule.
+CURATED_NEGATIVES: dict[str, list[str]] = {
+    "SP101": [
+        "import ast\n\n\ndef parse_payload(raw):\n    return ast.literal_eval(raw)\n",
+    ],
+    "SP103": [
+        'def get_user(cursor, user_id):\n    cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))\n    return cursor.fetchone()\n',
+    ],
+    "SP138": [
+        "import hmac\n\n\ndef verify(received, expected):\n    return hmac.compare_digest(received, expected)\n",
+    ],
+    "SP151": [
+        'import subprocess\n\n\ndef current_commit():\n    done = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, check=False, text=True)\n    return done.stdout.strip()\n',
+    ],
+    "SP163": [
+        "import ssl\n\n\ndef secure_context(cert_path):\n    return ssl.create_default_context(cafile=cert_path)\n",
+    ],
+    "SP104": [
+        'import requests\n\nsession = requests.Session()\nsession.verify = "/etc/ssl/certs/ca-bundle.crt"\nresponse = session.get("https://api.example.com/health")\n',
+    ],
+    "SP201": [
+        'import logging\n\nlogging.basicConfig(level=logging.INFO)\nlogger = logging.getLogger("app")\n',
+    ],
+    "SP105": [
+        'import jwt\n\n\ndef decode_token(token, key):\n    return jwt.decode(token, key, algorithms=["HS256"])\n',
+    ],
+    "SP144": [
+        'import jwt\n\n\ndef authenticate(token, secret):\n    payload = jwt.decode(token, secret, algorithms=["HS256"], options={"verify_signature": True})\n    return payload["sub"]\n',
+    ],
+    "SP164": [
+        'from flask import Flask\n\napp = Flask(__name__)\napp.config["DEBUG_TB_ENABLED"] = False\n',
+    ],
+    "SP122": [
+        "import secrets\n\n\ndef new_api_key():\n    return secrets.token_hex(32)\n",
+    ],
+    "SP165": [
+        'def get_entry(entry_id):\n    return list(Entry.objects.raw("SELECT * FROM entries WHERE id = %s", [entry_id]))\n',
+    ],
+    "SP110": [
+        'import os\n\nBASE_DIR = "/srv/app"\n\n\ndef static_asset(name):\n    return open(os.path.join(BASE_DIR, "static", name))\n',
+    ],
+    "SP124": [
+        'async function health() {\n    const response = await fetch("https://api.example.com/health");\n    return response.json();\n}\n',
+    ],
+    "SP175": [
+        'def with_request_id(response, request_id):\n    response.headers["X-Request-Id"] = request_id\n    return response\n',
+    ],
+    "SP141": [
+        "import os\nimport random\n\nrandom.seed(os.urandom(32))\n",
+    ],
+    "SP142": [
+        "from Crypto.Cipher import AES\n\ncipher = AES.new(key, AES.MODE_GCM, nonce=nonce)\n",
+    ],
+    "SP143": [
+        "import bcrypt\n\nhashed = bcrypt.hashpw(password, bcrypt.gensalt())\n",
+    ],
+    "SP123": [
+        "import os\n\niv = os.urandom(16)\ncipher = AES.new(key, AES.MODE_CBC, iv)\n",
+    ],
+    "SP190": [
+        'const cors = { origin: "https://app.example.com", credentials: true };\n',
+    ],
+    "SP158": [
+        'def auth_headers(api_token):\n    return {"Authorization": f"Bearer {api_token}"}\n',
+    ],
+}
+
+# Q03 cohort 1: production-shaped transformation positives. Each source must
+# produce exactly one finding; expectations are derived from the detector.
+CURATED_POSITIVES: dict[str, list[str]] = {
+    "SP101": [
+        "result = eval(\n    user_input\n)\n",
+    ],
+    "SP103": [
+        'result = query("SELECT * FROM orders WHERE status = {}".format(status))\n',
+    ],
+    "SP138": [
+        "if token_hash==computed:\n    grant()\n",
+    ],
+    "SP151": [
+        'subprocess.run("ls " + target, shell=True)\n',
+    ],
+    "SP163": [
+        "context = ssl.unverified_context_creation ()\n",
+    ],
+    "SP104": [
+        "client.get(url, verify=False)\n",
+    ],
+    "SP201": [
+        "app.run(debug=True)\n",
+    ],
+    "SP105": [
+        'jwt.decode(token, key, algorithms=["none"])\n',
+    ],
+    "SP144": [
+        'jwt.decode(token, secret, options={"verify_signature": False})\n',
+    ],
+    "SP164": [
+        'app.config["DEBUG_TB_ENABLED"] = True\n',
+    ],
+    "SP122": [
+        "".join(("token = ", "random.", "randint(1000, 9999)\n")),
+    ],
+    "SP165": [
+        "rows = Entry.objects.raw(\"SELECT * FROM entries WHERE name = '%s'\" % name)\n",
+    ],
+    "SP110": [
+        'data = open(f"uploads/{filename}")\n',
+    ],
+    "SP124": [
+        "const r = await axios.get(req.params.url)\n",
+    ],
+    "SP175": [
+        # Split across literals so this fixture source does not self-trigger
+        # repository scans; the joined value is the verified positive.
+        'res.set("Location", base + r' + "eq." + "qu" + "ery.next)\n",
+    ],
+    "SP141": [
+        "random.seed(time.time())\n",
+    ],
+    "SP142": [
+        "cipher = AES.new(key, AES.MODE_ECB)\n",
+    ],
+    "SP143": [
+        'bcrypt.hashpw(pw, "$2b$12$abcdefghijklmnopqrstuu")\n',
+    ],
+    "SP123": [
+        'crypto.createCipheriv("aes-256-cbc", key, "1234567890123456")\n',
+    ],
+    "SP190": [
+        "app.use(cors({ origin: 'null' }))\n",
+    ],
+    "SP158": [
+        # Split so the hardcoded-credential positive does not self-trigger scans.
+        '{"Authorization": "Basic ' + 'dXNlcjpwYXNz"}\n',
+    ],
 }
 
 
@@ -361,6 +506,73 @@ def positive_case(rule: Any, ecosystem: str, case_id: str, source: str) -> dict[
 
 
 def contract_entry(rule: Any, ecosystem: str) -> dict[str, Any]:
+    if rule.rule_id == "SP282":
+        positive_sources = (
+            "ollama pull models.example.test/team/model:latest",
+            "ollama run localhost:5000/team/model",
+            "ollama pull registry.ollama.ai:5443/team/model",
+        )
+        positive = [
+            positive_case(rule, ecosystem, f"positive-{'abc'[index]}", source)
+            for index, source in enumerate(positive_sources)
+        ]
+        negative_sources = (
+            "ollama pull gemma4",
+            "ollama run myteam/model:latest",
+            "ollama pull library/llama3.2",
+            "ollama pull registry.ollama.ai/library/gemma4",
+            'echo "ollama pull models.example.test/team/model"',
+        )
+        negative = []
+        for index, source in enumerate(negative_sources):
+            path = case_path(rule, ecosystem, f"negative-{'abcde'[index]}")
+            if active_findings(rule, path, source):
+                raise ValueError(f"{rule.rule_id} curated negative unexpectedly matched: {source}")
+            negative.append({"path": path, **encoded_text(source)})
+        adversarial_specs = (
+            (
+                "ollama pull registry.ollama.ai/library/gemma4",
+                False,
+                "An explicitly written default Ollama registry remains trusted and must not be confused with an external host.",
+            ),
+            (
+                "ollama pull registry.ollama.ai:443/library/gemma4",
+                False,
+                "The explicit standard HTTPS port on Ollama's default registry does not change the registry trust root and must stay silent.",
+            ),
+        )
+        adversarial = []
+        for index, (source, expected, rationale) in enumerate(adversarial_specs):
+            path = case_path(rule, ecosystem, f"adversarial-{'ab'[index]}")
+            detected = bool(active_findings(rule, path, source))
+            if detected is not expected:
+                raise ValueError(
+                    f"{rule.rule_id} curated adversarial mismatch: {source} expected={expected}"
+                )
+            adversarial.append(
+                {
+                    "path": path,
+                    **encoded_text(source),
+                    "expected": expected,
+                    "rationale": rationale,
+                }
+            )
+        return {
+            "rule_id": rule.rule_id,
+            "title": rule.title,
+            "category": rule.category,
+            "expected_severity": rule.severity,
+            "expected_confidence": rule.confidence,
+            "cwe": rule.cwe,
+            "frameworks": sorted(RULE_FRAMEWORK_HINTS.get(rule.rule_id, frozenset())),
+            "false_positive_analysis": RULE_EXPLANATIONS[rule.rule_id]["false_positive"],
+            "cases": {
+                "positive": positive,
+                "negative": negative,
+                "adversarial": adversarial,
+            },
+        }
+
     positive_count = 2 if rule.severity in {"critical", "high"} else 1
     sources: list[str] = []
     for variant in range(positive_count):
@@ -382,6 +594,16 @@ def contract_entry(rule: Any, ecosystem: str) -> dict[str, Any]:
         }
         for index in range(2)
     ]
+    for offset, source in enumerate(CURATED_NEGATIVES.get(rule.rule_id, [])):
+        case_id = f"negative-{chr(ord('c') + offset)}"
+        path = case_path(rule, ecosystem, case_id)
+        if active_findings(rule, path, source):
+            raise ValueError(f"{rule.rule_id}:{case_id} curated negative unexpectedly matched")
+        negative.append({"path": path, **encoded_text(source)})
+    for offset, source in enumerate(CURATED_POSITIVES.get(rule.rule_id, [])):
+        positive.append(
+            positive_case(rule, ecosystem, f"positive-{chr(ord('c') + offset)}", source)
+        )
     adversarial = [
         {
             "path": case_path(rule, ecosystem, "adversarial-a"),

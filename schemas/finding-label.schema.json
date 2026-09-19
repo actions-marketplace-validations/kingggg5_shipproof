@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kingggg5/shipproof/schemas/finding-label.schema.json",
+  "title": "ShipProof finding label record",
+  "description": "One reviewed finding. Never copy private source or credentials into notes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "corpus",
+    "package",
+    "revision",
+    "fingerprint",
+    "rule_id",
+    "label",
+    "proof_level",
+    "application_scope",
+    "shipproof_version"
+  ],
+  "properties": {
+    "corpus": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+    },
+    "package": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+    },
+    "revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "ecosystem": {
+      "type": "string",
+      "enum": ["python", "javascript", "typescript", "go", "rust", "other"]
+    },
+    "shipproof_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "rule_id": {
+      "type": "string",
+      "pattern": "^SP[0-9]{3}$"
+    },
+    "fingerprint": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]+$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "line": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "label": {
+      "enum": ["true_positive", "false_positive", "needs_context", "duplicate"]
+    },
+    "proof_level": {
+      "enum": ["L0", "L1", "L2"]
+    },
+    "application_scope": {
+      "type": "boolean"
+    },
+    "severity": {
+      "enum": ["critical", "high", "medium", "low"]
+    },
+    "confidence": {
+      "enum": ["high", "medium", "low"]
+    },
+    "remediation_verified": {
+      "type": "boolean",
+      "default": false
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "reviewer": {
+      "type": "string",
+      "maxLength": 128
+    }
+  }
+}

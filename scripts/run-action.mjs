@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, readFileSync, realpathSync, statSync, unlinkSync } from "node:fs";
+import { appendFileSync, existsSync, lstatSync, readFileSync, realpathSync, statSync, unlinkSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -37,6 +37,11 @@ export function validateActionInputs(environment = process.env) {
   if (!workspace) throw new Error("GITHUB_WORKSPACE is required");
   const format = environment.SHIPPROOF_INPUT_FORMAT || "sarif";
   const failOn = environment.SHIPPROOF_INPUT_FAIL_ON || "high";
+  const failOnIncompleteValue = environment.SHIPPROOF_INPUT_FAIL_ON_INCOMPLETE ?? "true";
+  if (!["true", "false"].includes(failOnIncompleteValue)) {
+    throw new Error("fail-on-incomplete must be true or false");
+  }
+  const failOnIncomplete = failOnIncompleteValue === "true";
   if (!FORMATS.has(format)) throw new Error(`unsupported report format: ${format}`);
   if (!SEVERITIES.has(failOn)) throw new Error(`unsupported fail-on severity: ${failOn}`);
 
@@ -61,10 +66,18 @@ export function validateActionInputs(environment = process.env) {
   if (!isInside(realWorkspace, realOutputParent)) {
     throw new Error("output directory resolves outside the workspace");
   }
-  if (existsSync(outputCandidate) && !statSync(outputCandidate).isFile()) {
+  // lstat catches dangling symlinks too. Never unlink or overwrite a link
+  // supplied by a repository/PR, even when its target is outside the workspace.
+  let outputMetadata = null;
+  try {
+    outputMetadata = lstatSync(outputCandidate);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  if (outputMetadata && (!outputMetadata.isFile() || outputMetadata.isSymbolicLink())) {
     throw new Error("output path is not a file");
   }
-  const output = existsSync(outputCandidate)
+  const output = outputMetadata
     ? realpathSync.native(outputCandidate)
     : join(realOutputParent, basename(outputCandidate));
   if (!isInside(realWorkspace, output)) throw new Error("output path resolves outside the workspace");
@@ -81,7 +94,7 @@ export function validateActionInputs(environment = process.env) {
   if (changedSince && !/^[A-Za-z0-9._/@][A-Za-z0-9._/@~-]*$/.test(changedSince)) {
     throw new Error("changed-since must be a plain git ref (branch, tag, or commit)");
   }
-  return { target, format, output, failOn, baseline, maxFileBytes, changedSince };
+  return { workspace: realWorkspace, target, format, output, failOn, failOnIncomplete, baseline, maxFileBytes, changedSince };
 }
 
 export function buildScannerArguments(inputs) {
@@ -99,11 +112,12 @@ export function buildScannerArguments(inputs) {
   ];
   if (inputs.baseline) argumentsList.push("--baseline", inputs.baseline);
   if (inputs.changedSince) argumentsList.push("--changed-since", inputs.changedSince);
+  argumentsList.push(inputs.failOnIncomplete ? "--fail-on-incomplete" : "--allow-incomplete");
   return argumentsList;
 }
 
-function findPython() {
-  const runtime = detectPythonRuntime();
+function findPython(workspace) {
+  const runtime = detectPythonRuntime({ rootPath: workspace });
   if (!runtime) throw new Error("Python 3.10+ is required by the ShipProof action");
   return { command: runtime.command, prefix: runtime.argumentPrefix };
 }
@@ -129,9 +143,10 @@ export function formatActionSummary(
   { exitCode = 0, failOn = "high" } = {},
 ) {
   try {
-    if (!existsSync(reportPath)) return "";
+    const metadata = lstatSync(reportPath);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) return "";
     const heading = gateSummaryHeading(exitCode, failOn);
-    const reportBytes = statSync(reportPath).size;
+    const reportBytes = metadata.size;
     if (reportBytes > MAX_SUMMARY_INPUT_BYTES) {
       return `${heading}\n\nSummary omitted because the report exceeds the ${MAX_SUMMARY_INPUT_BYTES}-byte display limit. Download the full report artifact.`;
     }
@@ -151,6 +166,9 @@ export function formatActionSummary(
         `Scanned **${data.summary?.files_scanned || 0}** files • Found **${findings.length}** issues`,
         "",
       ];
+      if (data.summary?.completeness?.is_complete === false) {
+        lines.push("Coverage: **INCOMPLETE**. Review the report's completeness ledger before accepting this gate.", "");
+      }
       if (findings.length > 0) {
         lines.push("| Severity | Rule | Location | Description |");
         lines.push("| :--- | :--- | :--- | :--- |");
@@ -173,6 +191,9 @@ export function formatActionSummary(
         `Found **${results.length}** issue(s)`,
         "",
       ];
+      if (sarif.runs?.[0]?.properties?.completeness?.is_complete === false) {
+        lines.push("Coverage: **INCOMPLETE**. Review the report's completeness ledger before accepting this gate.", "");
+      }
       if (results.length > 0) {
         lines.push("| Level | Rule | Location | Message |");
         lines.push("| :--- | :--- | :--- | :--- |");
@@ -197,8 +218,19 @@ export function formatActionSummary(
 export function main(environment = process.env) {
   try {
     const inputs = validateActionInputs(environment);
-    const python = findPython();
-    if (existsSync(inputs.output)) unlinkSync(inputs.output);
+    const python = findPython(inputs.workspace);
+    // validateActionInputs rejects existing symlinks; this second check closes
+    // the discovery/write race immediately before the scanner starts.
+    let outputMetadata = null;
+    try {
+      outputMetadata = lstatSync(inputs.output);
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+    if (outputMetadata?.isSymbolicLink() || (outputMetadata && !outputMetadata.isFile())) {
+      throw new Error("output path is not a regular file");
+    }
+    if (outputMetadata) unlinkSync(inputs.output);
     const result = spawnSync(python.command, [...python.prefix, ...buildScannerArguments(inputs)], {
       stdio: "inherit",
       shell: false,
@@ -211,16 +243,23 @@ export function main(environment = process.env) {
       console.error(`shipproof-action: scanner exited with status ${exitCode}; reporting unavailable evidence`);
       exitCode = 2;
     }
+    let reportMetadata = null;
+    try {
+      reportMetadata = lstatSync(inputs.output);
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
     const reportAvailable = (
       (exitCode === 0 || exitCode === 1)
-      && existsSync(inputs.output)
-      && statSync(inputs.output).isFile()
+      && Boolean(reportMetadata)
+      && reportMetadata.isFile()
+      && !reportMetadata.isSymbolicLink()
     );
     if ((exitCode === 0 || exitCode === 1) && !reportAvailable) {
       console.error("shipproof-action: scanner did not produce a fresh report");
       return 2;
     }
-    if (!reportAvailable && existsSync(inputs.output)) unlinkSync(inputs.output);
+    if (!reportAvailable && reportMetadata && !reportMetadata.isSymbolicLink()) unlinkSync(inputs.output);
     if (reportAvailable && environment.GITHUB_OUTPUT) {
       appendFileSync(environment.GITHUB_OUTPUT, `report-path=${inputs.output}\n`, "utf8");
     }

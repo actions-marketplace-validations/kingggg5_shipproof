@@ -36,6 +36,8 @@ jobs:
         run: npm ci --include=dev --ignore-scripts
       - name: Verify release source
         run: npm run check
+      - name: Precision thresholds against checked-in baseline
+        run: python scripts/check-precision-trend.py
       - id: release
         name: Validate tag and notes
         run: node scripts/release-info.mjs

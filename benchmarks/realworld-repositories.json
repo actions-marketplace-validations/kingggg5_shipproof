@@ -1,13 +1,16 @@
 {
   "schema_version": 1,
-  "reviewed_at": "2026-08-24",
-  "policy": "Every repository is fetched at an immutable full commit and its declared license file is verified before scanning. Finding counts are unreviewed observations, not automatic true/false-positive labels.",
+  "reviewed_at": "2026-09-15",
+  "policy": "Every repository is fetched at an immutable full commit and its declared license file is verified before scanning. Finding counts are unreviewed observations, not automatic true/false-positive labels. Development-split results may guide detector work; holdout-split results must never tune detectors.",
   "repositories": [
     {
       "name": "express",
       "url": "https://github.com/expressjs/express.git",
       "revision": "023767fe9872e029271df1418f73401bff20ff40",
       "classification": "clean_baseline",
+      "ecosystem": "javascript",
+      "kind": "library",
+      "split": "development",
       "license_spdx": "MIT",
       "license_path": "LICENSE",
       "license_url": "https://github.com/expressjs/express/blob/023767fe9872e029271df1418f73401bff20ff40/LICENSE"
@@ -17,6 +20,9 @@
       "url": "https://github.com/pallets/flask.git",
       "revision": "d318b683471101618febed18996405ad26462110",
       "classification": "clean_baseline",
+      "ecosystem": "python",
+      "kind": "library",
+      "split": "development",
       "license_spdx": "BSD-3-Clause",
       "license_path": "LICENSE.txt",
       "license_url": "https://github.com/pallets/flask/blob/d318b683471101618febed18996405ad26462110/LICENSE.txt"
@@ -26,6 +32,9 @@
       "url": "https://github.com/psf/requests.git",
       "revision": "8f8b212de8c2129d7954c6cd373762880375620a",
       "classification": "clean_baseline",
+      "ecosystem": "python",
+      "kind": "library",
+      "split": "development",
       "license_spdx": "Apache-2.0",
       "license_path": "LICENSE",
       "license_url": "https://github.com/psf/requests/blob/8f8b212de8c2129d7954c6cd373762880375620a/LICENSE"
@@ -35,6 +44,9 @@
       "url": "https://github.com/juice-shop/juice-shop.git",
       "revision": "1618a611b173b4bf114028e6e02549950606e29d",
       "classification": "intentionally_vulnerable",
+      "ecosystem": "javascript",
+      "kind": "vulnerable-app",
+      "split": "development",
       "license_spdx": "MIT",
       "license_path": "LICENSE",
       "license_url": "https://github.com/juice-shop/juice-shop/blob/1618a611b173b4bf114028e6e02549950606e29d/LICENSE"
@@ -44,6 +56,9 @@
       "url": "https://github.com/digininja/DVWA.git",
       "revision": "5d5c76cced604e54462b13723f5c69af58e78748",
       "classification": "intentionally_vulnerable",
+      "ecosystem": "php",
+      "kind": "vulnerable-app",
+      "split": "development",
       "license_spdx": "GPL-3.0-or-later",
       "license_path": "README.md",
       "license_url": "https://github.com/digininja/DVWA/blob/5d5c76cced604e54462b13723f5c69af58e78748/README.md#license"
@@ -53,9 +68,60 @@
       "url": "https://github.com/OWASP/NodeGoat.git",
       "revision": "c5cb68a7084e4ae7dcc60e6a98768720a81841e8",
       "classification": "intentionally_vulnerable",
+      "ecosystem": "javascript",
+      "kind": "vulnerable-app",
+      "split": "development",
       "license_spdx": "Apache-2.0",
       "license_path": "LICENSE",
       "license_url": "https://github.com/OWASP/NodeGoat/blob/c5cb68a7084e4ae7dcc60e6a98768720a81841e8/LICENSE"
+    },
+    {
+      "name": "gin",
+      "url": "https://github.com/gin-gonic/gin.git",
+      "revision": "75ccf94d605a05fe24817fc2f166f6f2959d5cea",
+      "classification": "clean_baseline",
+      "ecosystem": "go",
+      "kind": "service",
+      "split": "development",
+      "license_spdx": "MIT",
+      "license_path": "LICENSE",
+      "license_url": "https://github.com/gin-gonic/gin/blob/75ccf94d605a05fe24817fc2f166f6f2959d5cea/LICENSE"
+    },
+    {
+      "name": "click",
+      "url": "https://github.com/pallets/click.git",
+      "revision": "934813e4d421071a1b3db3973c02fe2721359a6e",
+      "classification": "clean_baseline",
+      "ecosystem": "python",
+      "kind": "cli",
+      "split": "development",
+      "license_spdx": "BSD-3-Clause",
+      "license_path": "LICENSE.txt",
+      "license_url": "https://github.com/pallets/click/blob/934813e4d421071a1b3db3973c02fe2721359a6e/LICENSE.txt"
+    },
+    {
+      "name": "preact",
+      "url": "https://github.com/preactjs/preact.git",
+      "revision": "ccd1e71e59018c09fe9c874376170b7aab52014f",
+      "classification": "clean_baseline",
+      "ecosystem": "javascript",
+      "kind": "frontend",
+      "split": "holdout",
+      "license_spdx": "MIT",
+      "license_path": "LICENSE",
+      "license_url": "https://github.com/preactjs/preact/blob/ccd1e71e59018c09fe9c874376170b7aab52014f/LICENSE"
+    },
+    {
+      "name": "petclinic",
+      "url": "https://github.com/spring-projects/spring-petclinic.git",
+      "revision": "818c4136ea971c21674525f9053de0d9c7ad8cfe",
+      "classification": "clean_baseline",
+      "ecosystem": "java",
+      "kind": "service",
+      "split": "holdout",
+      "license_spdx": "Apache-2.0",
+      "license_path": "LICENSE.txt",
+      "license_url": "https://github.com/spring-projects/spring-petclinic/blob/818c4136ea971c21674525f9053de0d9c7ad8cfe/LICENSE.txt"
     }
   ]
 }

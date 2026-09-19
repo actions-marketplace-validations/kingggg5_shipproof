@@ -14,6 +14,6 @@ The repository self-scan skips directories named `fixtures` so intentional vulne
 
 `command-contracts/` snapshots the complete normalized JSON report for every public evidence command. The Node CLI must match those fixtures exactly, and the Python compatibility test keeps schema-version `1.0` snapshots valid across later field changes.
 
-The multi-file corpora `node-taint-crossfile/` and `node-secure-crossfile/` extend the head-to-head benchmark: request input crosses file boundaries into concatenated SQL sinks, admin routes lack authorization middleware, and the secure counterpart parameterizes every query behind explicit auth guards. File-level labels live in `benchmarks/head-to-head-labels.json`.
+The multi-file corpora `node-taint-crossfile/` and `node-secure-crossfile/` extend the head-to-head benchmark: request input crosses file boundaries into concatenated SQL sinks, admin routes lack authorization middleware, and the secure counterpart parameterizes every query behind explicit auth guards. File-level and sink-line labels live in `benchmarks/head-to-head-labels.json`.
 
 The repository self-scan skips directories named `fixtures` so intentional vulnerabilities do not create misleading failures. Selecting a fixture directory as the scan root still analyzes it.

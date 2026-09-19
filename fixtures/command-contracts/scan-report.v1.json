@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "tool": {
     "name": "ShipProof",
-    "version": "0.10.0",
+    "version": "0.11.2",
     "command": "scan"
   },
   "root": "<ROOT>",
@@ -13,6 +13,22 @@
     "test_findings": 0,
     "files_scanned": 2,
     "suppressed": 0,
+    "completeness": {
+      "is_complete": true,
+      "reasons": [],
+      "unreadable": 0,
+      "parser_limit": 0,
+      "line_limit": 0,
+      "oversized": 0,
+      "containers": 0,
+      "assets": 0,
+      "binary": 0,
+      "symlinks": 0,
+      "excluded": 0,
+      "databases": 0,
+      "baseline_excluded": 0
+    },
+    "scan_profile": "application",
     "by_severity": {
       "high": 3,
       "medium": 3
@@ -40,6 +56,9 @@
       "column": 14,
       "end_line": null,
       "end_column": 25,
+      "match_confidence": "high",
+      "tier": "gate",
+      "scan_profile": "application",
       "fix_scaffold": {
         "summary": "Turn off debug mode in application code.",
         "before": "app = FastAPI(debug=True)",
@@ -67,7 +86,10 @@
       "verification_status": "unverified",
       "column": 12,
       "end_line": null,
-      "end_column": null
+      "end_column": null,
+      "match_confidence": "high",
+      "tier": "gate",
+      "scan_profile": "application"
     },
     {
       "rule_id": "SP004",
@@ -89,7 +111,10 @@
       "verification_status": "unverified",
       "column": 17,
       "end_line": null,
-      "end_column": 65
+      "end_column": 65,
+      "match_confidence": "high",
+      "tier": "gate",
+      "scan_profile": "application"
     },
     {
       "rule_id": "SP401",
@@ -111,7 +136,10 @@
       "verification_status": "unverified",
       "column": null,
       "end_line": null,
-      "end_column": null
+      "end_column": null,
+      "match_confidence": "medium",
+      "tier": "gate",
+      "scan_profile": "application"
     },
     {
       "rule_id": "SP402",
@@ -133,7 +161,10 @@
       "verification_status": "unverified",
       "column": null,
       "end_line": null,
-      "end_column": null
+      "end_column": null,
+      "match_confidence": "low",
+      "tier": "gate",
+      "scan_profile": "application"
     },
     {
       "rule_id": "SP664",
@@ -155,7 +186,10 @@
       "verification_status": "unverified",
       "column": null,
       "end_line": null,
-      "end_column": null
+      "end_column": null,
+      "match_confidence": "low",
+      "tier": "gate",
+      "scan_profile": "application"
     }
   ],
   "limitations": [

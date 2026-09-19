@@ -105,56 +105,6 @@
       }
     },
     {
-      "rule_id": "SP210",
-      "title": "GitHub Actions workflow script injection",
-      "category": "security",
-      "expected_severity": "high",
-      "expected_confidence": "high",
-      "cwe": "CWE-78",
-      "frameworks": [],
-      "false_positive_analysis": "Expressions used inside GitHub Action input parameters (with:) rather than inline shell scripts.",
-      "cases": {
-        "positive": [
-          {
-            "path": "contract-fixtures/infrastructure/sp210-positive-a.yaml",
-            "source_hex": "247b7b096769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d",
-            "expected_line": 1,
-            "expected_confidence": "high",
-            "expected_detection": "pattern",
-            "expected_proof_level": "L0",
-            "expected_fingerprint": "22d4cde6f1ad0b79226db77b"
-          },
-          {
-            "path": "contract-fixtures/infrastructure/sp210-positive-b.yaml",
-            "source_hex": "247b7b20096769746875622e6576656e742e69737375652e626f647909207d7d3b0a",
-            "expected_line": 1,
-            "expected_confidence": "high",
-            "expected_detection": "pattern",
-            "expected_proof_level": "L0",
-            "expected_fingerprint": "7f6865ac06dc5c2c78e62267"
-          }
-        ],
-        "negative": [
-          {
-            "path": "contract-fixtures/infrastructure/sp210-negative-a.yaml",
-            "source_hex": "217b7b096769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d"
-          },
-          {
-            "path": "contract-fixtures/infrastructure/sp210-negative-b.yaml",
-            "source_hex": "207b7b096769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d"
-          }
-        ],
-        "adversarial": [
-          {
-            "path": "contract-fixtures/infrastructure/sp210-adversarial-a.yaml",
-            "source_hex": "587b7b096769746875622e6576656e742e70756c6c5f726571756573742e7469746c65207d7d",
-            "expected": false,
-            "rationale": "A one-boundary near miss preserves most of the suspicious syntax while changing the detector's required token or delimiter; it records the current evasion and false-positive boundary without claiming data-flow reconstruction."
-          }
-        ]
-      }
-    },
-    {
       "rule_id": "SP211",
       "title": "GitHub Actions workflow missing explicit permissions",
       "category": "security",

@@ -7,7 +7,7 @@ prints bounded observations. Finding counts remain unreviewed until a human
 labels them; this tool does not manufacture precision claims.
 
 Usage:
-  python scripts/eval-realworld.py [--only express,flask] [--json]
+  python scripts/eval-realworld.py [--only express,flask] [--include-holdout] [--json]
 """
 
 from __future__ import annotations
@@ -27,15 +27,23 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "skills" / "audit-production-readiness" / "scripts"))
 
+from finding_labels import index_labels, load_label_records, score_findings  # noqa: E402
 from scan_repo import scan_repository  # noqa: E402
 
 MANIFEST = ROOT / "benchmarks" / "realworld-repositories.json"
+GROUND_TRUTH_DIR = ROOT / "benchmarks" / "ground-truth"
 NAME_PATTERN = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
 REVISION_PATTERN = re.compile(r"[0-9a-f]{40}")
+ECOSYSTEM_PATTERN = re.compile(r"[a-z0-9][a-z0-9+.-]{0,31}")
 CLASSIFICATIONS = {"clean_baseline", "intentionally_vulnerable"}
+SPLITS = {"development", "holdout"}
+KINDS = {"service", "cli", "frontend", "library", "vulnerable-app", "monorepo", "generated"}
 GIT_TIMEOUT_SECONDS = 180
+MAX_KLOC_BYTES = 1_000_000
+RECALL_LINE_WINDOW = 5
 
 
 def run_git(*arguments: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
@@ -109,6 +117,18 @@ def load_manifest(path: Path) -> dict[str, object]:
         for field in ("license_spdx", "license_path", "license_url"):
             if not isinstance(item.get(field), str) or not item[field]:
                 raise ValueError(f"{name}: {field} is required")
+        ecosystem = item.get("ecosystem", "unknown")
+        if not isinstance(ecosystem, str) or not ECOSYSTEM_PATTERN.fullmatch(ecosystem):
+            raise ValueError(f"{name}: invalid ecosystem")
+        item["ecosystem"] = ecosystem
+        kind = item.get("kind", "library")
+        if kind not in KINDS:
+            raise ValueError(f"{name}: kind must be one of {sorted(KINDS)}")
+        item["kind"] = kind
+        split = item.get("split", "development")
+        if split not in SPLITS:
+            raise ValueError(f"{name}: split must be one of {sorted(SPLITS)}")
+        item["split"] = split
         license_path = Path(item["license_path"])
         if license_path.is_absolute() or ".." in license_path.parts:
             raise ValueError(f"{name}: license_path must stay repository-relative")
@@ -200,6 +220,86 @@ def prepare(specification: dict[str, str], workspace: Path) -> Path:
     return target
 
 
+def kloc_tree(root: Path) -> float:
+    """Changed-KLOC denominator: counted lines of text files, in thousands."""
+    total = 0
+    for path in root.rglob("*"):
+        if not path.is_file() or path.is_symlink():
+            continue
+        try:
+            relative = path.relative_to(root)
+        except ValueError:
+            continue
+        if ".git" in relative.parts:
+            continue
+        try:
+            if path.stat().st_size > MAX_KLOC_BYTES:
+                continue
+            text = path.read_bytes().decode("utf-8", errors="replace")
+        except OSError:
+            continue
+        total += text.count("\n")
+    return round(total / 1000, 3)
+
+
+def load_ground_truth(name: str) -> dict[str, object] | None:
+    """Independent defect list for recall. Absence means recall is unknown."""
+    path = GROUND_TRUTH_DIR / f"{name}.json"
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"ground truth for {name} is not valid JSON: {exc}") from exc
+    if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+        raise ValueError(f"ground truth for {name} must be a schema_version 1 object")
+    defects = payload.get("defects")
+    if not isinstance(defects, list) or not defects:
+        raise ValueError(f"ground truth for {name} must list at least one defect")
+    for defect in defects:
+        if not isinstance(defect, dict):
+            raise ValueError(f"ground truth for {name} holds a non-object defect")
+        for field in ("id", "path", "line", "cwe", "reference"):
+            if field not in defect:
+                raise ValueError(f"ground truth for {name} has a defect missing {field}")
+        if not isinstance(defect["line"], int) or defect["line"] < 1:
+            raise ValueError(f"ground truth for {name} has a defect with a bad line")
+        for field in ("id", "path", "cwe", "reference"):
+            if not isinstance(defect[field], str) or not defect[field]:
+                raise ValueError(f"ground truth for {name} has a defect with a bad {field}")
+    return payload
+
+
+def recall_report(
+    ground_truth: dict[str, object] | None, app_findings: list[object]
+) -> dict[str, object]:
+    if ground_truth is None:
+        return {"status": "unknown", "reason": "no independent defect ground truth"}
+    defects = ground_truth.get("defects")
+    if not isinstance(defects, list):
+        raise ValueError("ground truth defects must be a list")
+    missed: list[str] = []
+    for defect in defects:
+        if not isinstance(defect, dict):
+            raise ValueError("ground truth defects must be objects")
+        hit = any(
+            getattr(item, "path", "").replace("\\", "/") == defect["path"]
+            and abs(int(getattr(item, "line", 0)) - int(defect["line"])) <= RECALL_LINE_WINDOW
+            for item in app_findings
+        )
+        if not hit:
+            missed.append(str(defect["id"]))
+    total = len(defects)
+    recalled = total - len(missed)
+    return {
+        "status": "measured",
+        "defects": total,
+        "recalled": recalled,
+        "recall": round(recalled / total, 4) if total else None,
+        "missed_ids": missed,
+    }
+
+
 def evaluate(specification: dict[str, str], workspace: Path) -> dict[str, object]:
     target = prepare(specification, workspace)
     started = time.perf_counter()
@@ -207,19 +307,35 @@ def evaluate(specification: dict[str, str], workspace: Path) -> dict[str, object
     elapsed = round(time.perf_counter() - started, 2)
     by_rule: dict[str, int] = {}
     by_severity: dict[str, int] = {}
+    by_proof: dict[str, int] = {}
     app_by_severity: dict[str, int] = {}
+    app_by_proof: dict[str, int] = {}
+    app_fingerprints: dict[str, int] = {}
+    app_findings = [finding for finding in findings if finding.scope == "app"]
     for finding in findings:
         by_rule[finding.rule_id] = by_rule.get(finding.rule_id, 0) + 1
         by_severity[finding.severity] = by_severity.get(finding.severity, 0) + 1
+        by_proof[finding.proof_level] = by_proof.get(finding.proof_level, 0) + 1
         if finding.scope == "app":
             # The gate verdict evaluates application code only; test-scope
             # findings are downranked noise for this measurement.
             app_by_severity[finding.severity] = app_by_severity.get(finding.severity, 0) + 1
+            app_by_proof[finding.proof_level] = app_by_proof.get(finding.proof_level, 0) + 1
+            app_fingerprints[finding.fingerprint] = app_fingerprints.get(finding.fingerprint, 0) + 1
+    duplicate_groups = sum(1 for count in app_fingerprints.values() if count > 1)
+    unique_fingerprints = len(app_fingerprints)
+    try:
+        ground_truth = load_ground_truth(specification["name"])
+    except ValueError as exc:
+        raise RuntimeError(f"{specification['name']}: {exc}") from exc
     return {
         "repo": specification["name"],
         "status": "scanned",
         "revision": specification["revision"],
         "classification": specification["classification"],
+        "ecosystem": specification.get("ecosystem", "unknown"),
+        "kind": specification.get("kind", "library"),
+        "split": specification.get("split", "development"),
         "license_spdx": specification["license_spdx"],
         "license_url": specification["license_url"],
         "license_file_sha256": hashlib.sha256(
@@ -227,13 +343,35 @@ def evaluate(specification: dict[str, str], workspace: Path) -> dict[str, object
         ).hexdigest(),
         "corpus_sha256": sha256_tree(target),
         "files": stats["files_scanned"],
+        "kloc": kloc_tree(target),
         "seconds": elapsed,
         "findings": len(findings),
         "app_findings": sum(app_by_severity.values()),
         "by_severity": dict(sorted(by_severity.items())),
+        "by_proof_level": dict(sorted(by_proof.items())),
         "app_by_severity": dict(sorted(app_by_severity.items())),
+        "app_by_proof_level": dict(sorted(app_by_proof.items())),
         "by_rule": dict(sorted(by_rule.items(), key=lambda item: -item[1])),
+        "duplicate_fingerprint_groups": duplicate_groups,
+        "unique_app_fingerprints": unique_fingerprints,
+        "duplicate_rate": (
+            round(1 - unique_fingerprints / len(app_findings), 4) if app_findings else 0.0
+        ),
+        "known_defect_recall": recall_report(ground_truth, app_findings),
         "finding_review_status": "unreviewed",
+        "app_finding_records": [
+            {
+                "rule_id": item.rule_id,
+                "severity": item.severity,
+                "confidence": item.confidence,
+                "proof_level": item.proof_level,
+                "path": item.path,
+                "line": item.line,
+                "fingerprint": item.fingerprint,
+            }
+            for item in findings
+            if item.scope == "app"
+        ][:500],
     }
 
 
@@ -242,6 +380,12 @@ def main() -> int:
     parser.add_argument("--manifest", type=Path, default=MANIFEST)
     parser.add_argument("--only", help="comma-separated reviewed repository names")
     parser.add_argument("--json", action="store_true", help="print raw JSON")
+    parser.add_argument("--labels", action="store_true", help="score reviewed JSONL labels")
+    parser.add_argument(
+        "--include-holdout",
+        action="store_true",
+        help="also scan holdout-split repositories; their results must never tune detectors",
+    )
     arguments = parser.parse_args()
 
     workspace = ROOT / "benchmarks" / ".work" / "oss-eval"
@@ -254,6 +398,10 @@ def main() -> int:
         print(f"real-world evaluation: invalid manifest: {exc}", file=sys.stderr)
         return 2
     targets = manifest["repositories"]
+    holdout_names = sorted(
+        item["name"] for item in targets if item.get("split", "development") == "holdout"
+    )
+    holdout_used = False
     if arguments.only is not None:
         requested = {value.strip() for value in arguments.only.split(",") if value.strip()}
         if not requested:
@@ -265,6 +413,17 @@ def main() -> int:
             print(f"real-world evaluation: unreviewed repository names: {unknown}", file=sys.stderr)
             return 2
         targets = [item for item in targets if item["name"] in requested]
+    if not arguments.include_holdout:
+        dropped = [item["name"] for item in targets if item.get("split") == "holdout"]
+        if dropped:
+            print(
+                f"real-world evaluation: holdout split excluded ({', '.join(dropped)}); "
+                "pass --include-holdout to scan it (results must never tune detectors)",
+                file=sys.stderr,
+            )
+        targets = [item for item in targets if item.get("split", "development") != "holdout"]
+    else:
+        holdout_used = any(item.get("split") == "holdout" for item in targets)
     results = []
     unavailable = []
     for specification in targets:
@@ -279,13 +438,36 @@ def main() -> int:
         "platform": platform.platform(),
         "python": platform.python_version(),
         "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+        "holdout_used": holdout_used,
+        "holdout_repos": holdout_names,
         "limitations": [
             "Repository classifications do not label individual findings; manual review is required before precision claims.",
             "This opt-in maintainer workflow requires network access and is never part of the default scanner path.",
+            "Holdout-split results must never tune detectors; using them for fixes consumes the holdout.",
+            "Recall is reported only where an independent defect ground truth exists; otherwise it is unknown.",
         ],
         "repos": results,
         "unavailable": unavailable,
     }
+    if arguments.labels:
+        try:
+            records = load_label_records(ROOT / "benchmarks" / "labels")
+            labels = index_labels(records)
+            unreviewed = 0
+            for item in results:
+                package_score = score_findings(
+                    list(item.get("app_finding_records") or []),
+                    labels,
+                    corpus="realworld",
+                    package=str(item["repo"]),
+                    revision=str(item["revision"]),
+                )
+                item["labels"] = package_score
+                unreviewed += int(package_score["unreviewed"])
+            payload["label_report"] = {"records": len(records), "unreviewed": unreviewed}
+        except ValueError as exc:
+            print(f"real-world evaluation: invalid labels: {exc}", file=sys.stderr)
+            return 2
     if arguments.json:
         print(json.dumps(payload, indent=2))
         return 2 if unavailable else 0
@@ -295,7 +477,8 @@ def main() -> int:
         print(
             f"{result['repo']:14} {result['files']:5} files {result['seconds']:6}s "
             f"findings={result['findings']:4} app={result['app_findings']:3} "
-            f"app_by_severity={result['app_by_severity']}"
+            f"app_by_severity={result['app_by_severity']} "
+            f"split={result.get('split', 'development')}"
         )
         top = list(result["by_rule"].items())[:8]
         if top:

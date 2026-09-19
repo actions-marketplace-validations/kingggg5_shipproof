@@ -24,8 +24,14 @@ MANIFEST_NAMES = (
 )
 LEGACY_CONTRACT_DIR = ROOT / "tests" / "rule-contracts"
 BASELINE_PATH = ROOT / "tests" / "rule_assurance_legacy.json"
+PRECISION_NEGATIVES_PATH = ROOT / "tests" / "precision_plan_negatives.json"
 RULE_ID_PATTERN = re.compile(r"\bSP\d{3,}\b")
 EXPLANATION_FIELDS = ("why", "attack", "false_positive", "test")
+STRUCTURAL_MARKERS = re.compile(
+    r"\b(?:def |async def |class |function |import |from |const |let |var |export |package )|"
+    r"^\s*(?:if |for |while |try:|except )",
+    re.MULTILINE,
+)
 
 
 def rule_number(rule_id: str) -> int:
@@ -69,8 +75,26 @@ def load_contracts() -> tuple[dict[str, dict[str, Any]], list[str], list[str]]:
                     polarity: declared_counts[polarity] - placeholder_counts[polarity]
                     for polarity in declared_counts
                 },
+                "negative_cases": list(cases.get("negative", [])),
             }
+    merge_precision_plan_negatives(contracts)
     return contracts, sorted(set(duplicate_ids), key=rule_number), malformed_entries
+
+
+def merge_precision_plan_negatives(contracts: dict[str, dict[str, Any]]) -> None:
+    if not PRECISION_NEGATIVES_PATH.is_file():
+        return
+    payload = json.loads(PRECISION_NEGATIVES_PATH.read_text(encoding="utf-8"))
+    for entry in payload.get("rules", []):
+        rule_id = entry.get("rule_id")
+        contract = contracts.get(rule_id) if isinstance(rule_id, str) else None
+        if contract is None:
+            continue
+        extra = {"path": entry.get("path", ""), "source": entry.get("source", "")}
+        contract["negative_cases"].append(extra)
+        contract["declared_counts"]["negative"] += 1
+        if not is_placeholder_case(extra, "negative"):
+            contract["effective_counts"]["negative"] += 1
 
 
 def is_placeholder_case(case: Any, polarity: str) -> bool:
@@ -116,6 +140,39 @@ def is_placeholder_case(case: Any, polarity: str) -> bool:
             and any(isinstance(part, str) and part.strip() for part in source_parts)
         )
     return bool(re.fullmatch(r"SAFE_(?:NEGATIVE|ADVERSARIAL)_SP\d{3,}", source))
+
+
+def case_source_text(case: Any) -> str:
+    if not isinstance(case, dict):
+        return ""
+    source_hex = case.get("source_hex")
+    if (
+        isinstance(source_hex, str)
+        and len(source_hex) % 2 == 0
+        and re.fullmatch(r"[0-9a-f]*", source_hex)
+    ):
+        try:
+            return bytes.fromhex(source_hex).decode("utf-8", "replace")
+        except ValueError:
+            return ""
+    source = case.get("source")
+    if isinstance(source, str):
+        return source
+    parts = case.get("source_parts")
+    if isinstance(parts, list):
+        return "".join(part for part in parts if isinstance(part, str))
+    return ""
+
+
+def is_realistic_negative(case: Any) -> bool:
+    if is_placeholder_case(case, "negative"):
+        return False
+    text = case_source_text(case).strip()
+    if len(text) < 48:
+        return False
+    if text.count("\n") >= 2:
+        return True
+    return bool(STRUCTURAL_MARKERS.search(text))
 
 
 def reference_files_by_rule() -> dict[str, list[str]]:
@@ -177,6 +234,19 @@ def classify_rule(
         status = "partial"
     else:
         status = "complete"
+    negative_cases = contract["negative_cases"] if contract else []
+    realistic_negatives = sum(1 for case in negative_cases if is_realistic_negative(case))
+    near_miss_negatives = sum(
+        1
+        for case in negative_cases
+        if not is_placeholder_case(case, "negative") and not is_realistic_negative(case)
+    )
+    if realistic_negatives:
+        negative_quality = "realistic"
+    elif near_miss_negatives:
+        negative_quality = "near_miss_only"
+    else:
+        negative_quality = "none"
     return {
         "rule_id": rule.rule_id,
         "severity": rule.severity,
@@ -190,6 +260,9 @@ def classify_rule(
         "missing_contract": missing_contract,
         "missing_metadata": missing_metadata,
         "legacy_reference_files": reference_files.get(rule.rule_id, []),
+        "negative_quality": negative_quality,
+        "realistic_negatives": realistic_negatives,
+        "near_miss_negatives": near_miss_negatives,
     }
 
 
@@ -217,8 +290,16 @@ def build_report() -> dict[str, Any]:
     current_uncontracted = {
         item["rule_id"] for item in inventory if item["status"] == "uncontracted"
     }
+    current_unrealistic = {
+        item["rule_id"]
+        for item in inventory
+        if item["severity"] in {"critical", "high"} and item["negative_quality"] != "realistic"
+    }
     baseline_partial = set(baseline.get("partial_contract_ids", [])) if baseline else set()
     baseline_uncontracted = set(baseline.get("uncontracted_ids", [])) if baseline else set()
+    baseline_unrealistic = (
+        set(baseline.get("high_critical_without_realistic_negative_ids", [])) if baseline else set()
+    )
     current_debt = current_partial | current_uncontracted
     baseline_debt = baseline_partial | baseline_uncontracted
     metadata_debt = {item["rule_id"] for item in inventory if item["missing_metadata"]}
@@ -234,6 +315,12 @@ def build_report() -> dict[str, Any]:
         "misclassified_uncontracted_rule_ids": sorted(
             baseline_uncontracted ^ current_uncontracted,
             key=rule_number,
+        ),
+        "new_unrealistic_high_critical_ids": sorted(
+            current_unrealistic - baseline_unrealistic, key=rule_number
+        ),
+        "stale_unrealistic_high_critical_ids": sorted(
+            baseline_unrealistic - current_unrealistic, key=rule_number
         ),
         "manifest_rule_ids_not_executable": sorted(set(contracts) - scanner_ids, key=rule_number),
         "duplicate_manifest_rule_ids": duplicate_ids,
@@ -259,6 +346,13 @@ def build_report() -> dict[str, Any]:
             "partial": status_counts["partial"],
             "uncontracted": status_counts["uncontracted"],
             "metadata_debt": len(metadata_debt),
+            "realistic_negatives": sum(
+                1 for item in inventory if item["negative_quality"] == "realistic"
+            ),
+            "near_miss_only_negatives": sum(
+                1 for item in inventory if item["negative_quality"] == "near_miss_only"
+            ),
+            "high_critical_without_realistic_negatives": len(current_unrealistic),
             "by_severity": {
                 severity: {
                     status: counts[status] for status in ("complete", "partial", "uncontracted")
@@ -284,6 +378,11 @@ def build_baseline(report: dict[str, Any]) -> dict[str, Any]:
         ],
         "uncontracted_ids": [
             item["rule_id"] for item in report["rules"] if item["status"] == "uncontracted"
+        ],
+        "high_critical_without_realistic_negative_ids": [
+            item["rule_id"]
+            for item in report["rules"]
+            if item["severity"] in {"critical", "high"} and item["negative_quality"] != "realistic"
         ],
     }
 
@@ -314,13 +413,17 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"| Partial | {summary['partial']} | Has a manifest but misses at least one minimum |",
         f"| Uncontracted | {summary['uncontracted']} | No explicit machine-readable polarity manifest |",
         f"| Metadata debt | {summary['metadata_debt']} | Missing CWE, remediation, or explanation fields |",
+        f"| Realistic negatives | {summary['realistic_negatives']} | At least one negative that looks like production code |",
+        f"| Near-miss negatives only | {summary['near_miss_only_negatives']} | Token-boundary negatives without production-shaped silence |",
+        f"| High/critical missing realistic negatives | {summary['high_critical_without_realistic_negatives']} | Shrink-only transitional debt |",
         "",
         f"{gate_name}: **{'PASS' if report['gate']['passed'] else 'FAIL'}**",
         "",
         gate_detail,
         "",
         "Placeholder-only `SAFE_NEGATIVE_*` and `SAFE_ADVERSARIAL_*` strings are reported but do not "
-        "count as meaningful polarity evidence.",
+        "count as meaningful polarity evidence. Realistic negatives are production-shaped silent "
+        "fixtures; the high/critical list in the debt baseline can only shrink.",
         "",
         "Maintainer source-checkout command: "
         "`python scripts/rule_assurance_report.py --format json --check`.",
@@ -371,8 +474,12 @@ def main() -> int:
             current.get("uncontracted_ids", [])
         )
         new_debt = set(generated["partial_contract_ids"]) | set(generated["uncontracted_ids"])
-        if not new_debt <= old_debt:
-            added = sorted(new_debt - old_debt, key=rule_number)
+        old_unrealistic = set(current.get("high_critical_without_realistic_negative_ids", []))
+        new_unrealistic = set(generated["high_critical_without_realistic_negative_ids"])
+        if not new_debt <= old_debt or not new_unrealistic <= old_unrealistic:
+            added = sorted(
+                (new_debt - old_debt) | (new_unrealistic - old_unrealistic), key=rule_number
+            )
             print(
                 "refusing to expand the reviewed debt baseline: " + ", ".join(added),
                 file=sys.stderr,

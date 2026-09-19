@@ -11,7 +11,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-VERSION = "0.10.0"
+VERSION = "0.11.2"
 
 
 def load_json_object(path: str | Path) -> dict[str, object]:
@@ -20,7 +20,7 @@ def load_json_object(path: str | Path) -> dict[str, object]:
             value = json.loads(sys.stdin.read())
         else:
             value = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, json.JSONDecodeError, RecursionError, MemoryError) as exc:
         raise ValueError(f"cannot read {path}: {exc}") from exc
     if not isinstance(value, dict):
         raise ValueError(f"{path} must contain a JSON object")

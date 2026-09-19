@@ -1,18 +1,28 @@
 {
-  "schema_version": 2,
-  "label_contract": "positive_files are expected finding locations. context_only_files participate in a vulnerable chain but are intentionally excluded from file-level recall because ShipProof reports at the sink/root-cause location.",
+  "schema_version": 3,
+  "label_contract": "positive_files are expected finding locations. context_only_files participate in a vulnerable chain but are intentionally excluded from file-level recall because ShipProof reports at the sink/root-cause location. positive_lines are the expected sink lines in those files; tools are scored on path and line only so a caller-supplied comparison scanner can be measured without mapping rule IDs. rule_id documents the ShipProof detector for that sink and is not used for cross-tool matching.",
   "corpora": {
     "vulnerable-node-api": {
       "positive_files": ["app.js"],
-      "context_only_files": []
+      "context_only_files": [],
+      "positive_lines": [
+        {"path": "app.js", "line": 3, "rule_id": "SP103"},
+        {"path": "app.js", "line": 6, "rule_id": "SP104"}
+      ]
     },
     "vulnerable-python-api": {
       "positive_files": ["app.py"],
-      "context_only_files": []
+      "context_only_files": [],
+      "positive_lines": [
+        {"path": "app.py", "line": 6, "rule_id": "SP201"},
+        {"path": "app.py", "line": 9, "rule_id": "SP664"},
+        {"path": "app.py", "line": 11, "rule_id": "SP304"}
+      ]
     },
     "secure-node-api": {
       "positive_files": [],
-      "context_only_files": []
+      "context_only_files": [],
+      "positive_lines": []
     },
     "node-taint-crossfile": {
       "positive_files": [
@@ -21,11 +31,21 @@
         "services/order-service.js",
         "utils/storage.js"
       ],
-      "context_only_files": ["routes/orders.js"]
+      "context_only_files": ["routes/orders.js"],
+      "positive_lines": [
+        {"path": "routes/admin.js", "line": 8, "rule_id": "SP401"},
+        {"path": "routes/admin.js", "line": 10, "rule_id": "SP108"},
+        {"path": "routes/admin.js", "line": 15, "rule_id": "SP108"},
+        {"path": "routes/admin.js", "line": 16, "rule_id": "SP103"},
+        {"path": "routes/files.js", "line": 12, "rule_id": "SP104"},
+        {"path": "services/order-service.js", "line": 5, "rule_id": "SP103"},
+        {"path": "utils/storage.js", "line": 6, "rule_id": "SP110"}
+      ]
     },
     "node-secure-crossfile": {
       "positive_files": [],
-      "context_only_files": []
+      "context_only_files": [],
+      "positive_lines": []
     },
     "adversarial-node": {
       "positive_files": [
@@ -37,6 +57,12 @@
       "context_only_files": [
         "routes/vuln-chain.js",
         "services/chain.js"
+      ],
+      "positive_lines": [
+        {"path": "db/raw.js", "line": 3, "rule_id": "SP103"},
+        {"path": "vuln-cookie-dom.js", "line": 6, "rule_id": "SP147"},
+        {"path": "vuln-destructure-fs.js", "line": 4, "rule_id": "SP110"},
+        {"path": "vuln-two-hop.js", "line": 6, "rule_id": "SP101"}
       ]
     }
   }

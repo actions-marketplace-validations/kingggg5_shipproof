@@ -1,0 +1,1297 @@
+{
+  "schema_version": "1.0",
+  "tool": {
+    "name": "ShipProof",
+    "version": "0.10.0",
+    "command": "eval-clean-corpus"
+  },
+  "verdict": "PASS_WITH_EVIDENCE",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.10",
+  "manifest_sha256": "98b46bf1dd22a31d66992f7789ee43c1a925fbe8b2f89df63b29c023d267e3cc",
+  "limitations": [
+    "Installed packages are not a vulnerability-free guarantee; findings stay unreviewed until labeled.",
+    "Digests cover scannable source files only so compiled wheels do not make the fingerprint platform-specific.",
+    "This opt-in maintainer workflow requires network access and is never part of the default scanner path."
+  ],
+  "summary": {
+    "packages": 15,
+    "files": 524,
+    "app_findings": 63,
+    "blocked_packages": [],
+    "blocked_count": 0
+  },
+  "packages": [
+    {
+      "package": "flask",
+      "status": "scanned",
+      "ecosystem": "python",
+      "version": "3.1.3",
+      "license_spdx": "BSD-3-Clause",
+      "source_sha256": "5293e154cb0d8b93cc05521693900012b5fa8211afc67441e18feec441f26c5a",
+      "files": 25,
+      "seconds": 1.44,
+      "findings": 4,
+      "app_findings": 4,
+      "by_severity": {
+        "low": 4
+      },
+      "by_confidence": {
+        "low": 4
+      },
+      "by_rule": {
+        "SP061": 4
+      },
+      "verdict": "CONDITIONAL",
+      "scan_profile": "library",
+      "finding_review_status": "unreviewed",
+      "app_finding_records": [
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "app.py",
+          "line": 945,
+          "fingerprint": "7fd998b6446c69ced6b9fc18",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "app.py",
+          "line": 1515,
+          "fingerprint": "4b6adb9f1f1ff8672c814f84",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "cli.py",
+          "line": 658,
+          "fingerprint": "9d8e4664593a0f180ecb3560",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "config.py",
+          "line": 163,
+          "fingerprint": "f25193eef9d656313d772094",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        }
+      ],
+      "labels": {
+        "unreviewed": 4,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    },
+    {
+      "package": "requests",
+      "status": "scanned",
+      "ecosystem": "python",
+      "version": "2.33.1",
+      "license_spdx": "Apache-2.0",
+      "source_sha256": "2e1a64e19857c433fef6e850b6ed6b5e3a96550d93dafcbfec08fa3431acefa4",
+      "files": 18,
+      "seconds": 0.71,
+      "findings": 0,
+      "app_findings": 0,
+      "by_severity": {},
+      "by_confidence": {},
+      "by_rule": {},
+      "verdict": "PASS_WITH_EVIDENCE",
+      "scan_profile": "library",
+      "finding_review_status": "reviewed",
+      "app_finding_records": [],
+      "labels": {
+        "unreviewed": 0,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    },
+    {
+      "package": "fastapi",
+      "status": "scanned",
+      "ecosystem": "python",
+      "version": "0.140.12",
+      "license_spdx": "MIT",
+      "source_sha256": "97a51367609c3acd17d2833512884a1f78d4293099136ac4c0b46d9f872e7e29",
+      "files": 55,
+      "seconds": 3.0,
+      "findings": 2,
+      "app_findings": 2,
+      "by_severity": {
+        "low": 1,
+        "medium": 1
+      },
+      "by_confidence": {
+        "low": 1,
+        "medium": 1
+      },
+      "by_rule": {
+        "SP356": 1,
+        "SP061": 1
+      },
+      "verdict": "CONDITIONAL",
+      "scan_profile": "library",
+      "finding_review_status": "unreviewed",
+      "app_finding_records": [
+        {
+          "rule_id": "SP356",
+          "severity": "medium",
+          "confidence": "medium",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "openapi/models.py",
+          "line": 57,
+          "fingerprint": "c82479d3a99ef431ed9f8ccb",
+          "detection": "pattern",
+          "tier": "gate",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "routing.py",
+          "line": 292,
+          "fingerprint": "c4142be86464b689393d2746",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        }
+      ],
+      "labels": {
+        "unreviewed": 2,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    },
+    {
+      "package": "werkzeug",
+      "status": "scanned",
+      "ecosystem": "python",
+      "version": "3.1.8",
+      "license_spdx": "BSD-3-Clause",
+      "source_sha256": "e258d3829191550a2f2f8d1e27c903aa62a927695a5dcbca0108df6c4910fc7f",
+      "files": 55,
+      "seconds": 3.35,
+      "findings": 10,
+      "app_findings": 10,
+      "by_severity": {
+        "low": 10
+      },
+      "by_confidence": {
+        "low": 10
+      },
+      "by_rule": {
+        "SP061": 10
+      },
+      "verdict": "CONDITIONAL",
+      "scan_profile": "library",
+      "finding_review_status": "unreviewed",
+      "app_finding_records": [
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "datastructures/file_storage.py",
+          "line": 142,
+          "fingerprint": "4a7bcf3376c4b4feeb19e9c2",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "debug/__init__.py",
+          "line": 371,
+          "fingerprint": "bec6e8211ff22d234627260b",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "debug/console.py",
+          "line": 178,
+          "fingerprint": "002ddef70f0db93cd063c64a",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "debug/repr.py",
+          "line": 220,
+          "fingerprint": "15dc8511e4f731bc74e9588a",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "debug/repr.py",
+          "line": 237,
+          "fingerprint": "15dc8511e4f731bc74e9588a",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "debug/repr.py",
+          "line": 260,
+          "fingerprint": "15dc8511e4f731bc74e9588a",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "middleware/lint.py",
+          "line": 223,
+          "fingerprint": "b070eff5bace625a1b357847",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "serving.py",
+          "line": 388,
+          "fingerprint": "ea07c623440abc58e1fafc33",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "test.py",
+          "line": 646,
+          "fingerprint": "64ac12a01b74481e997846ec",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "test.py",
+          "line": 663,
+          "fingerprint": "64ac12a01b74481e997846ec",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        }
+      ],
+      "labels": {
+        "unreviewed": 10,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    },
+    {
+      "package": "httpx",
+      "status": "scanned",
+      "ecosystem": "python",
+      "version": "0.28.1",
+      "license_spdx": "BSD-3-Clause",
+      "source_sha256": "6b49d3bb7f0aa995da547e8a2532f9b36137d319d952fd507292d6408758040f",
+      "files": 23,
+      "seconds": 1.48,
+      "findings": 4,
+      "app_findings": 4,
+      "by_severity": {
+        "low": 3,
+        "medium": 1
+      },
+      "by_confidence": {
+        "low": 3,
+        "medium": 1
+      },
+      "by_rule": {
+        "SP061": 3,
+        "SP121": 1
+      },
+      "verdict": "CONDITIONAL",
+      "scan_profile": "library",
+      "finding_review_status": "unreviewed",
+      "app_finding_records": [
+        {
+          "rule_id": "SP121",
+          "severity": "medium",
+          "confidence": "medium",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_client.py",
+          "line": 553,
+          "fingerprint": "8220b69da9b89cb3a6ebf15b",
+          "detection": "pattern",
+          "tier": "gate",
+          "match_confidence": "medium"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_transports/asgi.py",
+          "line": 171,
+          "fingerprint": "1eda04b1d775edb21fc9ae60",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_utils.py",
+          "line": 232,
+          "fingerprint": "3b64242420127ef050b977e5",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_utils.py",
+          "line": 240,
+          "fingerprint": "3b64242420127ef050b977e5",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        }
+      ],
+      "labels": {
+        "unreviewed": 4,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    },
+    {
+      "package": "click",
+      "status": "scanned",
+      "ecosystem": "python",
+      "version": "8.3.3",
+      "license_spdx": "BSD-3-Clause",
+      "source_sha256": "ff9c8a36395a262fb73d62bc968d96bcb2a5d71e4a6f87c5fc0b42cbd666b95f",
+      "files": 17,
+      "seconds": 1.63,
+      "findings": 18,
+      "app_findings": 18,
+      "by_severity": {
+        "low": 18
+      },
+      "by_confidence": {
+        "low": 18
+      },
+      "by_rule": {
+        "SP061": 18
+      },
+      "verdict": "CONDITIONAL",
+      "scan_profile": "library",
+      "finding_review_status": "unreviewed",
+      "app_finding_records": [
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_compat.py",
+          "line": 74,
+          "fingerprint": "f617f841fce7ed9225da7236",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_compat.py",
+          "line": 121,
+          "fingerprint": "f617f841fce7ed9225da7236",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_compat.py",
+          "line": 133,
+          "fingerprint": "f617f841fce7ed9225da7236",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_compat.py",
+          "line": 136,
+          "fingerprint": "f617f841fce7ed9225da7236",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_compat.py",
+          "line": 146,
+          "fingerprint": "f617f841fce7ed9225da7236",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_compat.py",
+          "line": 154,
+          "fingerprint": "f617f841fce7ed9225da7236",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_compat.py",
+          "line": 163,
+          "fingerprint": "f617f841fce7ed9225da7236",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_compat.py",
+          "line": 167,
+          "fingerprint": "f617f841fce7ed9225da7236",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_compat.py",
+          "line": 528,
+          "fingerprint": "f617f841fce7ed9225da7236",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_compat.py",
+          "line": 552,
+          "fingerprint": "f617f841fce7ed9225da7236",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_compat.py",
+          "line": 575,
+          "fingerprint": "f617f841fce7ed9225da7236",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_compat.py",
+          "line": 593,
+          "fingerprint": "f617f841fce7ed9225da7236",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_compat.py",
+          "line": 600,
+          "fingerprint": "f617f841fce7ed9225da7236",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_winconsole.py",
+          "line": 208,
+          "fingerprint": "aec5a47b0f7fb08e4c00529b",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "core.py",
+          "line": 2609,
+          "fingerprint": "3f48fcd5d1bf38b522414dbd",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "testing.py",
+          "line": 500,
+          "fingerprint": "713d943a77cdce9205cb41f1",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "testing.py",
+          "line": 510,
+          "fingerprint": "713d943a77cdce9205cb41f1",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "utils.py",
+          "line": 42,
+          "fingerprint": "9f3dcc478df4089e283307ec",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        }
+      ],
+      "labels": {
+        "unreviewed": 18,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    },
+    {
+      "package": "jinja2",
+      "status": "scanned",
+      "ecosystem": "python",
+      "version": "3.1.6",
+      "license_spdx": "BSD-3-Clause",
+      "source_sha256": "03258c05e68a3754d2c4218feb82b398c8c09f9a77a59b735b141c18ff08d2eb",
+      "files": 25,
+      "seconds": 3.21,
+      "findings": 11,
+      "app_findings": 11,
+      "by_severity": {
+        "low": 11
+      },
+      "by_confidence": {
+        "low": 11
+      },
+      "by_rule": {
+        "SP061": 11
+      },
+      "verdict": "CONDITIONAL",
+      "scan_profile": "library",
+      "finding_review_status": "unreviewed",
+      "app_finding_records": [
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "bccache.py",
+          "line": 391,
+          "fingerprint": "06c4235ca8d49eaca8854464",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "bccache.py",
+          "line": 406,
+          "fingerprint": "06c4235ca8d49eaca8854464",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "environment.py",
+          "line": 476,
+          "fingerprint": "b20b40aa4432f658c5bfb813",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "environment.py",
+          "line": 1294,
+          "fingerprint": "b20b40aa4432f658c5bfb813",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "environment.py",
+          "line": 1317,
+          "fingerprint": "b20b40aa4432f658c5bfb813",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "environment.py",
+          "line": 1347,
+          "fingerprint": "b20b40aa4432f658c5bfb813",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "environment.py",
+          "line": 1372,
+          "fingerprint": "b20b40aa4432f658c5bfb813",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "nativetypes.py",
+          "line": 111,
+          "fingerprint": "1c62aa9f844ce4ed19682696",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "nativetypes.py",
+          "line": 126,
+          "fingerprint": "1c62aa9f844ce4ed19682696",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "sandbox.py",
+          "line": 298,
+          "fingerprint": "45d4f607a139f1f330af2a9d",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "tests.py",
+          "line": 174,
+          "fingerprint": "fbdfae986d3a27e9efb97629",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        }
+      ],
+      "labels": {
+        "unreviewed": 11,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    },
+    {
+      "package": "urllib3",
+      "status": "scanned",
+      "ecosystem": "python",
+      "version": "2.6.3",
+      "license_spdx": "MIT",
+      "source_sha256": "071a2fc706ef7631f4e08b5e4c6dcf74d8fa8847aab4941dd7b398477c375c34",
+      "files": 37,
+      "seconds": 1.92,
+      "findings": 3,
+      "app_findings": 3,
+      "by_severity": {
+        "low": 2,
+        "medium": 1
+      },
+      "by_confidence": {
+        "high": 1,
+        "low": 2
+      },
+      "by_rule": {
+        "SP061": 2,
+        "SP310": 1
+      },
+      "verdict": "CONDITIONAL",
+      "scan_profile": "library",
+      "finding_review_status": "unreviewed",
+      "app_finding_records": [
+        {
+          "rule_id": "SP310",
+          "severity": "medium",
+          "confidence": "high",
+          "proof_level": "L1",
+          "scope": "app",
+          "path": "connectionpool.py",
+          "line": 1173,
+          "fingerprint": "0a3433cf3f36c87f253b34f0",
+          "detection": "ast",
+          "tier": "gate",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "http2/connection.py",
+          "line": 313,
+          "fingerprint": "34c7a33b761f1e57349ef4db",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "util/connection.py",
+          "line": 129,
+          "fingerprint": "791d290662bb844f2c96292a",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        }
+      ],
+      "labels": {
+        "unreviewed": 3,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    },
+    {
+      "package": "pydantic",
+      "status": "scanned",
+      "ecosystem": "python",
+      "version": "2.13.3",
+      "license_spdx": "MIT",
+      "source_sha256": "d64b8604ab048ff50ee7b9a898471ccca96bb64a4153fe34bee958ae3ec66b9e",
+      "files": 105,
+      "seconds": 8.44,
+      "findings": 11,
+      "app_findings": 11,
+      "by_severity": {
+        "low": 4,
+        "medium": 7
+      },
+      "by_confidence": {
+        "low": 4,
+        "medium": 7
+      },
+      "by_rule": {
+        "SP308": 5,
+        "SP061": 4,
+        "SP106": 2
+      },
+      "verdict": "CONDITIONAL",
+      "scan_profile": "library",
+      "finding_review_status": "unreviewed",
+      "app_finding_records": [
+        {
+          "rule_id": "SP106",
+          "severity": "medium",
+          "confidence": "medium",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "deprecated/parse.py",
+          "line": 54,
+          "fingerprint": "60bfc914345f3c650b8521d1",
+          "detection": "pattern",
+          "tier": "gate",
+          "match_confidence": "medium"
+        },
+        {
+          "rule_id": "SP106",
+          "severity": "medium",
+          "confidence": "medium",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "v1/parse.py",
+          "line": 42,
+          "fingerprint": "3461dfe3b897d9c9100d3b16",
+          "detection": "pattern",
+          "tier": "gate",
+          "match_confidence": "medium"
+        },
+        {
+          "rule_id": "SP308",
+          "severity": "medium",
+          "confidence": "medium",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "v1/networks.py",
+          "line": 114,
+          "fingerprint": "2c6f083d46a4ddedae81dd1b",
+          "detection": "pattern",
+          "tier": "gate",
+          "match_confidence": "medium"
+        },
+        {
+          "rule_id": "SP308",
+          "severity": "medium",
+          "confidence": "medium",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "v1/networks.py",
+          "line": 130,
+          "fingerprint": "328484cfda57689217054de9",
+          "detection": "pattern",
+          "tier": "gate",
+          "match_confidence": "medium"
+        },
+        {
+          "rule_id": "SP308",
+          "severity": "medium",
+          "confidence": "medium",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "v1/networks.py",
+          "line": 142,
+          "fingerprint": "93cc58c5d613687a19a7c7f0",
+          "detection": "pattern",
+          "tier": "gate",
+          "match_confidence": "medium"
+        },
+        {
+          "rule_id": "SP308",
+          "severity": "medium",
+          "confidence": "medium",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "v1/networks.py",
+          "line": 153,
+          "fingerprint": "956b9d78cb880c60362a972f",
+          "detection": "pattern",
+          "tier": "gate",
+          "match_confidence": "medium"
+        },
+        {
+          "rule_id": "SP308",
+          "severity": "medium",
+          "confidence": "medium",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "v1/networks.py",
+          "line": 162,
+          "fingerprint": "168219a1ccd0bac8d94469c2",
+          "detection": "pattern",
+          "tier": "gate",
+          "match_confidence": "medium"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_internal/_core_utils.py",
+          "line": 85,
+          "fingerprint": "541821368a82203805e8f6ea",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "_internal/_typing_extra.py",
+          "line": 356,
+          "fingerprint": "c6a2713f35bb52a485068a45",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "json_schema.py",
+          "line": 1201,
+          "fingerprint": "5c0572cbc380476be8096d75",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        },
+        {
+          "rule_id": "SP061",
+          "severity": "low",
+          "confidence": "low",
+          "proof_level": "L0",
+          "scope": "app",
+          "path": "v1/_hypothesis_plugin.py",
+          "line": 226,
+          "fingerprint": "6a3294aa9ef2001f942d5c30",
+          "detection": "pattern",
+          "tier": "advisory",
+          "match_confidence": "high"
+        }
+      ],
+      "labels": {
+        "unreviewed": 11,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    },
+    {
+      "package": "body-parser",
+      "status": "scanned",
+      "ecosystem": "javascript",
+      "version": "2.3.0",
+      "license_spdx": "MIT",
+      "source_sha256": "27392e012c63428a59cc6d8766c6f27ef1418e7d5f652a1004ad548f5400b641",
+      "files": 10,
+      "seconds": 0.17,
+      "findings": 0,
+      "app_findings": 0,
+      "by_severity": {},
+      "by_confidence": {},
+      "by_rule": {},
+      "verdict": "PASS_WITH_EVIDENCE",
+      "scan_profile": "library",
+      "finding_review_status": "reviewed",
+      "app_finding_records": [],
+      "labels": {
+        "unreviewed": 0,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    },
+    {
+      "package": "cors",
+      "status": "scanned",
+      "ecosystem": "javascript",
+      "version": "2.8.6",
+      "license_spdx": "MIT",
+      "source_sha256": "e99104f0c32acd24e0d567a03f969c921229ee1bd618069a612b1ee6fa64e7ab",
+      "files": 4,
+      "seconds": 0.05,
+      "findings": 0,
+      "app_findings": 0,
+      "by_severity": {},
+      "by_confidence": {},
+      "by_rule": {},
+      "verdict": "PASS_WITH_EVIDENCE",
+      "scan_profile": "library",
+      "finding_review_status": "reviewed",
+      "app_finding_records": [],
+      "labels": {
+        "unreviewed": 0,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    },
+    {
+      "package": "ajv",
+      "status": "scanned",
+      "ecosystem": "javascript",
+      "version": "8.20.0",
+      "license_spdx": "MIT",
+      "source_sha256": "ac6ddb455aa0ed13e6b5b43ea3ca4ab3c5f902f8c6d909f41d9382c8f1a8ce3c",
+      "files": 129,
+      "seconds": 1.74,
+      "findings": 0,
+      "app_findings": 0,
+      "by_severity": {},
+      "by_confidence": {},
+      "by_rule": {},
+      "verdict": "PASS_WITH_EVIDENCE",
+      "scan_profile": "library",
+      "finding_review_status": "reviewed",
+      "app_finding_records": [],
+      "labels": {
+        "unreviewed": 0,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    },
+    {
+      "package": "cookie",
+      "status": "scanned",
+      "ecosystem": "javascript",
+      "version": "0.7.2",
+      "license_spdx": "MIT",
+      "source_sha256": "e1a90570b8364fa8bd96dbdbb8cd9c9695e677db11a165d0d3ff529bee0b7e62",
+      "files": 5,
+      "seconds": 0.06,
+      "findings": 0,
+      "app_findings": 0,
+      "by_severity": {},
+      "by_confidence": {},
+      "by_rule": {},
+      "verdict": "PASS_WITH_EVIDENCE",
+      "scan_profile": "library",
+      "finding_review_status": "reviewed",
+      "app_finding_records": [],
+      "labels": {
+        "unreviewed": 0,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    },
+    {
+      "package": "cross-spawn",
+      "status": "scanned",
+      "ecosystem": "javascript",
+      "version": "7.0.6",
+      "license_spdx": "MIT",
+      "source_sha256": "267726562874a7581c7b5b4e21bf832706d5549182a560b28a4b2821ec066df3",
+      "files": 9,
+      "seconds": 0.08,
+      "findings": 0,
+      "app_findings": 0,
+      "by_severity": {},
+      "by_confidence": {},
+      "by_rule": {},
+      "verdict": "PASS_WITH_EVIDENCE",
+      "scan_profile": "library",
+      "finding_review_status": "reviewed",
+      "app_finding_records": [],
+      "labels": {
+        "unreviewed": 0,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    },
+    {
+      "package": "debug",
+      "status": "scanned",
+      "ecosystem": "javascript",
+      "version": "4.4.3",
+      "license_spdx": "MIT",
+      "source_sha256": "b0ad994a5eece245449ca06b5af8804088dd67091bc776f2bf29a7118e8937b1",
+      "files": 7,
+      "seconds": 0.11,
+      "findings": 0,
+      "app_findings": 0,
+      "by_severity": {},
+      "by_confidence": {},
+      "by_rule": {},
+      "verdict": "PASS_WITH_EVIDENCE",
+      "scan_profile": "library",
+      "finding_review_status": "reviewed",
+      "app_finding_records": [],
+      "labels": {
+        "unreviewed": 0,
+        "by_rule": {},
+        "by_severity": {},
+        "by_proof_level": {}
+      }
+    }
+  ],
+  "unavailable": [],
+  "label_report": {
+    "records": 0,
+    "by_rule": {},
+    "fp_budget_violations": [],
+    "unreviewed": 63,
+    "unreviewed_high_critical": 0
+  }
+}

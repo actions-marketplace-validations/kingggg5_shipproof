@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 
-VERSION = "0.10.0"
+VERSION = "0.11.2"
 K6_METHODS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"})
 ENVIRONMENT_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 ROUTE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
@@ -542,7 +542,10 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def load_config(config_path: Path) -> tuple[dict[str, object], object | None]:
-    config_payload = json.loads(config_path.read_text(encoding="utf-8"))
+    try:
+        config_payload = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, RecursionError, MemoryError) as exc:
+        raise ValueError(f"cannot read capacity config: {config_path}") from exc
     if not isinstance(config_payload, dict):
         raise ValueError("config file must contain a JSON object")
 

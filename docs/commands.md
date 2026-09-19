@@ -11,7 +11,7 @@ shipproof help
 
 Use `SHIPPROOF_PYTHON` only when Python is not discoverable as `py -3`, `python3`, or `python`. Set it to an executable path or command name, not a command string with arguments. The detected runtime is probed once per process and shared by every gate.
 
-Policy gates launched by `shipproof check` buffer scanner JSON with a 60 second timeout and a 16 MB output cap. Override with `SHIPPROOF_GATE_TIMEOUT_MS` (minimum 1000) and `SHIPPROOF_MAX_BUFFER_BYTES` (minimum 65536); a timeout, an output overflow, or a scanner crash is always reported as exit `2` (invalid or unavailable evidence), never as a gate block.
+Policy gates launched by `shipproof check` buffer scanner JSON with a 120 second timeout and a 16 MB output cap. Override with `SHIPPROOF_GATE_TIMEOUT_MS` (minimum 1000) and `SHIPPROOF_MAX_BUFFER_BYTES` (minimum 65536); a timeout, an output overflow, or a scanner crash is always reported as exit `2` (invalid or unavailable evidence), never as a gate block.
 
 ## JSON evidence contracts
 
@@ -73,11 +73,38 @@ shipproof scan . --format json --trace --fail-on high
 shipproof scan . --fix-prompt --context-level overview
 ```
 
-The arguments after `scan` match `scan_repo.py`. `--fail-on` accepts `critical`, `high`, `medium`, `low`, or `none`. `--changed-since GIT_REF` limits the scan to files changed relative to a git ref (added, copied, modified, renamed, plus untracked files) and fails closed with exit `2` outside a git repository or on an unresolvable ref; the ref is recorded under `changed_since` in JSON output. Repeat `--exclude` with repository-relative glob patterns to skip generated or vendored paths. Parent traversal and absolute patterns are rejected. `--cross-file` opts into interprocedural taint analysis: unsanitized flows from route entrypoints through helpers into dangerous sinks (SQL, command execution, eval) across files are promoted to `L2` taint findings on the sink line, and the flow count is recorded under `cross_file_flows` in JSON output. Cross-file analysis is slower and remains deterministic and offline. `--jobs N` scans files with N worker processes for large repositories; output is byte-identical to the sequential scan (`--jobs 1` stays sequential), and the scanner falls back to sequential execution with a stderr note when process pools are unavailable.
+The arguments after `scan` match `scan_repo.py`. `--fail-on` accepts `critical`, `high`, `medium`, `low`, or `none`. `--block-min-proof` accepts `L0`, `L1`, or `L2` and defaults to `L1`: findings below that proof level still appear, but they produce `REVIEW` instead of `BLOCK` unless they are allowlisted high-confidence secrets or application debug flags. `--scan-profile` accepts `auto`, `application`, or `library`; `auto` treats repositories without application entrypoints as libraries and downranks application-oriented rules. `--changed-since GIT_REF` selects changed files (added, copied, modified, renamed, plus untracked files) and returns exit `2` outside a git repository or for an unresolvable ref. The ref is recorded as `summary.changed_since`. Repeat `--exclude` with repository-relative globs; absolute and parent-traversal patterns are rejected.
+
+The Node launcher resolves Python from absolute host `PATH` entries and rejects repository-local shadow binaries. For `scan <path>`, the selected path is also the runtime trust boundary, while the original launcher directory remains the working directory so relative scanner arguments keep their documented meaning. Missing or unsupported runtimes return exit `2` rather than running a repository-provided interpreter.
+
+`--cross-file` opts into offline interprocedural taint analysis across selected, successfully read files; unsanitized flows into supported dangerous sinks become `L2` findings. `--jobs N` uses worker processes for large repositories with byte-identical output to `--jobs 1`. If the pool fails, the scanner resets partial results and counters before retrying sequentially, with a stderr note.
+
+`--inspect-archives` opts into bounded in-memory inspection of ZIP-based containers (`.zip`, Office Open XML, JAR/WAR/wheel). Members are never extracted to disk or executed. Paths are reported as `archive.zip!/inner.js`. Nested archives, path escape, encryption, member/byte/ratio bombs, and non-ZIP containers such as `.tar` / `.7z` stay incomplete. Default scans still omit container members.
 
 `--trace` adds a deterministic decision trace to JSON, Markdown, or terminal repository-scan output. It reports bounded counts for rule selection, file selection, filters, baseline suppression, and gate evaluation. It deliberately excludes source text, evidence text, finding paths, secret values, timestamps, timings, user identifiers, and network telemetry. The option is rejected for SARIF, GitHub annotations, snippets, explanations, fix prompts, and autofix modes instead of silently doing less than requested.
 
-`--context-level summary|overview|full` progressively discloses `--fix-prompt` content. `summary` is the compact remediation contract, `overview` adds local context and implicit requirements, and `full` adds engineering dimensions and failure scenarios. The default is `full`, preserving existing output. Exit `0` means no finding met the threshold, `1` means the threshold failed, and `2` means evidence or input was invalid.
+`--context-level summary|overview|full` progressively discloses `--fix-prompt` content. `summary` is the compact remediation contract, `overview` adds local context and implicit requirements, and `full` adds engineering dimensions and failure scenarios. The default is `full`, preserving existing output. Exit `0` means the configured gates passed, `1` means a severity or explicitly enabled completeness gate failed, and `2` means evidence or input was invalid.
+
+### Coverage and baseline contracts
+
+`summary.completeness` accounts for the selected source scope, not all repository content or runtime behavior. Unreadable files/directories, parser-limit failures, source files above `--max-file-bytes`, overlong source lines (over 8,192 characters), symlinks/reparse points, unknown binaries, and containers such as ZIP with uninspected members set `is_complete: false`. A would-be pass becomes `CONDITIONAL`; high/critical findings still produce `BLOCK`. The policy-check report also retains `CONDITIONAL` when its gates pass but scan coverage is incomplete. Repository `scan`, the GitHub Action, and MCP default to fail-closed incomplete coverage; the production `check` command additionally enforces a full-root scan, a high security floor, a bounded 10 MB source limit, and ignores repository policy attempts to weaken those controls.
+
+| Entry point | Completeness gate |
+| --- | --- |
+| Python / Node `scan` | Enabled by default; `--fail-on-incomplete` remains accepted for explicit command intent; `--allow-incomplete` is an explicit exploratory override |
+| `check` repository policy | Always fail-closed for incomplete scan evidence |
+| GitHub Action | `fail-on-incomplete: "true"` (default) |
+| MCP `shipproof_scan` | `fail_on_incomplete: true` (default) |
+
+Repository scan, Action, and MCP defaults are strict. `scan --allow-incomplete`, or an Action/MCP boolean set to `false` (translated to that flag), is an explicit exploratory override that must not be used for release evidence. `check` ignores repository attempts to weaken the high security floor or fail-closed coverage. The gate remains effective with `--fail-on none` and autofix/dry-run. MCP returns evidence rather than process exit codes; strict mode adds `decision_trace.gate.failed`. JSON and SARIF Action summaries flag incomplete coverage; SARIF also records `runs[0].properties.completeness` and an unsuccessful invocation with a warning notification.
+
+Changed-only scope, explicit excludes, and baseline-file exclusions are applied before omission counts. Recognized assets (including generated `.sarif` reports) and database artifacts are deliberately outside source inspection; unknown binaries and symlinks/reparse points are counted as incomplete evidence. Dependency/build trees are pruned for bounded performance, but repository scans consult the Git index (and explicit changed-file selections) and inspect tracked files inside those trees, so a committed payload cannot hide behind a conventional directory name. Untracked members of pruned trees are not enumerated; unreadable counts may include a directory error rather than a known file count. Database artifacts are identified from a bounded header, not by analyzing their contents. `files_scanned` counts successful source/artifact inspections, not failed reads. Source and framework-manifest reads are byte-bounded; unsupported UTF-8 source is reported as unreadable. Scan a quiescent checkout: this is not a filesystem snapshot or a guarantee that every language construct, hidden payload, or runtime dependency was analyzed.
+
+`--show-suppressed` lists baseline-suppressed findings in JSON, Markdown, or terminal. SARIF retains these findings as external suppressions even without that flag and also accepts the flag. It is rejected with GitHub annotations, snippet/stdin, explanation, fix-prompt, and autofix modes instead of silently ignoring the request.
+
+Baseline format version 2 accepts legacy string fingerprints, reasoned fingerprint objects, and human-authored glob rules. Every supplied matcher in a rule (`id`, `path`, `evidence`) must match; at least one matcher and a non-empty `reason` are required. Unknown fields and duplicate JSON keys are rejected to prevent accidental scope widening. Matcher/metadata strings are limited to 512 printable characters, fingerprints to 10,000 entries, rules to 256, and input/output to 2,000,000 bytes. Missing files, invalid values, or exceeded limits return exit `2`.
+
+`--baseline-out` writes active fingerprints and preserves glob rules. Supply `--baseline-reason TEXT` after reviewing the debt; without it the reason is `Generated baseline; review required`. Review the generated file before loading it with `--baseline`; generation is not approval. Keep secrets out of reason and matcher text. Version-1 string baselines remain readable. Fingerprints use the existing finding identity, not whole-file/content digests; `scanner_version` is informational with a major-version warning, not cryptographic provenance or a stale-suppression check.
 
 ## `explain`
 
@@ -96,7 +123,7 @@ shipproof check .
 shipproof check . --config .shipproof.yml --format json
 ```
 
-Loads a version-1 repository policy and executes its fixed scan, performance-budget, and capacity gates. The configuration is a strict, dependency-free YAML subset: mappings use two-space indentation, `scan.exclude` is a scalar list, and anchors, tags, block scalars, executable values, duplicate keys, unknown fields, path traversal, and arbitrary commands are rejected.
+Loads a version-1 repository policy and executes its fixed scan, performance-budget, and capacity gates. The configuration is a strict, dependency-free YAML subset: mappings use two-space indentation, `scan.exclude` is a scalar list, and anchors, tags, block scalars, executable values, duplicate keys, unknown fields, path traversal, and arbitrary commands are rejected. Policy is repository-authored input, so `check` ignores policy attempts to narrow the scan or lower the security floor and always fails closed when scan evidence is incomplete.
 
 Exit `0` means every declared evidence gate passed, exit `1` means a declared scan or performance gate blocked, and exit `2` means the policy or required evidence was invalid or unavailable. Capacity remains explicitly `CONDITIONAL` evidence and does not block merely because the model requires production-shaped validation.
 
@@ -203,9 +230,12 @@ shipproof gate evidence . --list --format json
 shipproof gate evidence . --adapter typescript --allow-project-code --format json
 shipproof gate evidence . --adapter go --format json
 shipproof gate evidence . --adapter rust --allow-project-code --format json
+shipproof gate evidence --import fixtures/external-evidence/valid-envelope.json --format json
 ```
 
 Adapters are fixed: repository-local TypeScript `tsc --noEmit`, `go vet ./...` with module downloads disabled, and offline `cargo clippy`. TypeScript and Rust require `--allow-project-code`: the local `tsc` is repository-controlled and Cargo may execute `build.rs`. Even the repository-local TypeScript version probe is not executed during discovery without that consent; `--list` reports `approval required` instead. There is no pass-through for commands or analyzer arguments. Every ready adapter must pass its own version probe; JSON evidence records that bounded version string. Diagnostics are redacted, capped at 200 lines and 4,096 characters per line, and the child process has a fixed 2 MB output cap and 120-second timeout. Timeout, output overflow, crash, or unavailable tools return exit `2`; analyzer findings return `1`; a usable clean analyzer run returns `0`.
+
+`--import FILE` is a separate opt-in path for a versioned external evidence envelope. The file must declare a non-ShipProof tool identity, semantic version, config/target digests, timestamp, and limitations. Imported findings keep `original_rule_id` and `proof_level: external`; they are never rewritten as native ShipProof proof. Malformed, oversized, or identity-spoofed envelopes return exit `2`. The importer does not download, execute, or refresh the originating tool.
 
 ## `mcp`
 
@@ -217,6 +247,8 @@ shipproof mcp
 ```
 
 The server registers five tools: `shipproof_scan`, `shipproof_budget`, `shipproof_capacity`, `shipproof_explain`, and `shipproof_lint_snippet`. `shipproof_explain` accepts `context_level` with the same `summary`, `overview`, and `full` contract as the CLI. `SHIPPROOF_MCP_ROOT` selects the only accessible repository root. The adapter canonicalizes existing paths, rejects traversal and symlink escape, and bounds scanner subprocesses.
+
+Every `shipproof_scan` call reads current source files. `SHIPPROOF_MCP_CACHE_MS` is deprecated: values from `0` through `3600000` remain accepted and validated for configuration compatibility, but no scan verdict is cached. A nonzero value produces a startup warning on stderr. Python runtime discovery is still cached; repository findings are not.
 
 ## Pre-commit and composite action
 

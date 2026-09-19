@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
 import fnmatch
 import hashlib
 import importlib.util
@@ -16,6 +17,7 @@ import shutil
 import stat as stat_module
 import subprocess
 import sys
+import tempfile
 import threading
 
 try:  # Python 3.11+ ships the regex parser as a private re submodule.
@@ -31,8 +33,12 @@ from dataclasses import asdict, dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 
-VERSION = "0.10.0"
+import archive_inspect
+import precision as precision_policy
+
+VERSION = "0.11.2"
 MAX_SNIPPET_BYTES = 200_000
+MAX_SCAN_LINE_CHARS = 8_192
 CONTEXT_LEVELS = ("summary", "overview", "full")
 
 SEVERITY = {"none": 99, "critical": 0, "high": 1, "medium": 2, "low": 3}
@@ -43,7 +49,7 @@ SEVERITY_ICON = {
     "medium": "\U0001f7e1",
     "low": "\U0001f7e2",
 }
-CONFIDENCE_LABEL = {"high": "CONFIRMED", "medium": "LIKELY", "low": "NEEDS_REVIEW"}
+CONFIDENCE_LABEL = {"high": "HIGH_CONFIDENCE", "medium": "LIKELY", "low": "NEEDS_REVIEW"}
 SKIP_DIRS = {
     ".git",
     ".hg",
@@ -65,6 +71,8 @@ SKIP_DIRS = {
     ".nuxt",
     ".cache",
     ".npm-cache",
+    ".shipproof-research-cache",
+    "research",
     ".pytest_cache",
     ".mypy_cache",
     ".ruff_cache",
@@ -111,7 +119,13 @@ TEXT_SUFFIXES = {
     ".sql",
     ".graphql",
     ".gql",
+    ".css",
+    ".scss",
+    ".sass",
+    ".less",
+    ".cff",
     ".json",
+    ".jsonl",
     ".yaml",
     ".yml",
     ".toml",
@@ -142,6 +156,13 @@ TEXT_NAMES = {
     ".netrc",
     ".npmrc",
     ".pypirc",
+    ".editorconfig",
+    ".gitattributes",
+    ".gitmodules",
+    ".npmignore",
+    ".gitkeep",
+    "license",
+    "codeowners",
 }
 PLACEHOLDERS = re.compile(
     r"(?i)(example|sample|placeholder|dummy|changeme|replace[_-]?me|your[_-]?|test[_-]?only|"
@@ -1438,7 +1459,7 @@ RULE_EXPLANATIONS: dict[str, dict[str, str]] = {
     "SP210": {
         "why": "Direct interpolation of user-controlled event text into run scripts allows shell injection in CI.",
         "attack": "Attacker titles an issue '; curl script execution' which executes in the CI runner.",
-        "false_positive": "Expressions used inside GitHub Action input parameters (with:) rather than inline shell scripts.",
+        "false_positive": "Only step run scalars in .github/workflows are checked. env, with, names, YAML comments and scalar prose stay silent. Flow maps, aliases and multiline expressions are unresolved; script reachability still requires review.",
         "test": "Set environment variables under env: and reference them in bash as $TITLE.",
     },
     "SP211": {
@@ -1496,10 +1517,10 @@ RULE_EXPLANATIONS: dict[str, dict[str, str]] = {
         "test": "Change service type to ClusterIP.",
     },
     "SP220": {
-        "why": "Committed .env files expose database credentials, third-party API keys, and internal secrets.",
-        "attack": "Attacker clones repository and extracts all environment secrets directly from the .env file.",
-        "false_positive": "Example template files such as .env.example containing placeholder values.",
-        "test": "Add .env to .gitignore and verify it is not tracked in git.",
+        "why": "A sensitive environment filename in the Git index risks publishing configuration or credentials. Index membership does not prove a commit, push, or actual secret content.",
+        "attack": "If real credentials are committed and shared, repository readers may recover them; verify content and exposure before declaring compromise.",
+        "false_positive": "Requires actual Git-index membership in the selected scan scope; .gitignore text, untracked files and example/template names do not qualify. A deliberately non-secret tracked .env still needs human review. Missing Git evidence is reported as incomplete coverage.",
+        "test": "Test real tracked and ignored/untracked files, nested scan roots, scope exclusions and unavailable Git. Removing a file from the index does not purge past commits.",
     },
     "SP221": {
         "why": "Unpinned git references track floating branches; a compromised remote repository injects malicious code.",
@@ -3434,10 +3455,10 @@ RULE_EXPLANATIONS: dict[str, dict[str, str]] = {
         "test": "Add a test confirming that use atomic `set lock_key token nx px 30000` (set if not exists with 30s expiration).",
     },
     "SP583": {
-        "why": "BullMQ worker without stalledInterval may delay recovering jobs from crashed or killed worker processes.",
-        "attack": "An attacker or runtime failure exploits `BullMQ job worker instantiated without stalledInterval configuration` to bypass controls or degrade service availability.",
-        "false_positive": "Test fixtures or local mock environments may trigger this rule; verify whether the code path runs in production.",
-        "test": "Add a test confirming that set `stalledinterval: 30000` and `maxstalledcount: 2` in worker options.",
+        "why": "BullMQ enables stalled checks by default. Explicit skipStalledCheck: true disables this worker's checker and may leave recovery dependent on another worker.",
+        "attack": "After a worker crash, expired jobs can remain stalled if no other worker is responsible for checking them; this is not proof that recovery is absent system-wide.",
+        "false_positive": "Requires a visible BullMQ Worker import/require and a literal opt-out in constructor options. Default options, Node workers, shadowed bindings and unknown spreads stay silent. A dedicated external checker can make the opt-out intentional; templates with interpolation and indirect options are unresolved.",
+        "test": "Test named/aliased/namespace/require BullMQ bindings, enabled defaults, Node worker lookalikes, shadowing and explicit opt-outs. Verify another worker owns recovery or remove the opt-out.",
     },
     "SP584": {
         "why": "Executing a Temporal activity without start_to_close_timeout allows hung activities to block workflow execution indefinitely.",
@@ -3518,9 +3539,9 @@ RULE_EXPLANATIONS: dict[str, dict[str, str]] = {
         "test": "Add 'use client' at the top of the file or extract stateful logic into a separate Client Component.",
     },
     "SP597": {
-        "why": "Sequential await fetch calls in Server Components multiply SSR latency and delay First Contentful Paint (FCP).",
-        "attack": "High latency cascades into timeout errors when upstream services experience slight latency blips.",
-        "false_positive": "Dependent queries where the second fetch strictly depends on data from the first fetch.",
+        "why": "Adjacent awaits on distinct literal default-GET URLs in one async Server Component can serialize uncached rendering work.",
+        "attack": "Slow upstreams can add their latencies during an uncached render. Static prerendering and cache hits change the actual user impact; no runtime slowdown is proven.",
+        "false_positive": "Limited to exported async page/layout components and known Next.js or manifest-unknown context. Separate functions, dependent requests, identical memoized URLs, client components, request options and shadowed fetch are excluded. Ordering requirements, cache behavior and runtime impact still need review; indirect syntax and template interpolation are unresolved.",
         "test": "Parallelize independent fetches using Promise.all([fetch1, fetch2]) or wrap in <Suspense> boundaries.",
     },
     "SP598": {
@@ -3530,9 +3551,9 @@ RULE_EXPLANATIONS: dict[str, dict[str, str]] = {
         "test": "Verify request.headers.get('origin') matches host or enforce SameSite=Strict cookies with CSRF tokens.",
     },
     "SP599": {
-        "why": "Using non-null assertions (!) on dynamic API responses leads to unhandled TypeError exceptions if fields are missing.",
-        "attack": "Third-party API omission of a field crashes the Node/Edge server process during response parsing.",
-        "false_positive": "Variables with prior explicit if (data.field == null) guard checks.",
+        "why": "A non-null assertion does not validate JSON fields at runtime. An immediately following property/index/call dereference may throw if a parsed field is null or absent.",
+        "attack": "A missing JSON field can reject the calling operation; exception handling determines whether this affects a request or a wider process.",
+        "false_positive": "Requires a local await receiver.json() assignment and immediate same-block dereference of that binding. Local field names, assertion-only expressions, guards, validation steps and separate scopes stay silent. Custom json methods returning validated data require review; aliases, intervening statements and template interpolation are unresolved.",
         "test": "Use Zod validation or optional chaining (?.) with nullish coalescing defaults (??).",
     },
     "SP600": {
@@ -3722,9 +3743,9 @@ RULE_EXPLANATIONS: dict[str, dict[str, str]] = {
         "test": "Enforce HTTPS redirection: viewer_protocol_policy = 'redirect-to-https'.",
     },
     "SP631": {
-        "why": "Importing Node.js native filesystem or child_process modules in Edge/Serverless runtimes causes runtime crashes as these APIs do not exist.",
+        "why": "A literal Edge runtime declaration together with a native Node.js import uses APIs unavailable in Next.js Edge; ordinary Node.js serverless runtimes are not covered by this claim.",
         "attack": "Edge route crashes on invocation, resulting in 500 errors and service downtime.",
-        "false_positive": "Build-time code or edge runners with explicit polyfill layers.",
+        "false_positive": "Requires a literal module-level export const runtime = 'edge' and a runtime import, not prose, substring matches, commented imports, or import type. Computed/multiline declarations and ambiguous JSX/template contexts remain unsupported; build-time polyfills still need human review.",
         "test": "Use Edge-compatible Web Standard APIs (Fetch, Streams, Web Crypto) instead of node:fs / node:child_process.",
     },
     "SP632": {
@@ -3931,6 +3952,36 @@ RULE_EXPLANATIONS: dict[str, dict[str, str]] = {
         "false_positive": "Local development settings legitimately enable DEBUG; the finding targets settings modules that also carry deployment markers such as ALLOWED_HOSTS or production middleware stacks.",
         "test": "Keep DEBUG = False in deployable settings, assert the deployed configuration via a settings-dump management command or deployment smoke test.",
     },
+    "SP666": {
+        "why": "Browser-reported upload MIME metadata is attacker-controlled and cannot establish the actual content type of a file.",
+        "attack": "An attacker labels a script or active document as an allowed image MIME type, bypasses an allowlist, and stores or serves the payload from the application.",
+        "false_positive": "The metadata may be used only for logging or a preliminary UI branch; content validation performed later through finfo or equivalent is outside this narrow line detector.",
+        "test": "Validate the temporary upload contents with finfo or an equivalent content-aware parser, then assert the stored file is served with a safe type and disposition.",
+    },
+    "SP667": {
+        "why": "A sensitive cookie without HttpOnly can be read through document.cookie after an XSS bug and replayed as an authenticated session.",
+        "attack": "An attacker chains a script-injection flaw with a session cookie that omits HttpOnly and exfiltrates the cookie value from the browser.",
+        "false_positive": "The cookie may be deliberately non-sensitive or constructed through a helper that sets HttpOnly later; this rule only reports direct sensitive cookie literals.",
+        "test": "Set HttpOnly: true, Secure: true, and an appropriate SameSite value on sensitive cookies, then assert the emitted Set-Cookie header contains those attributes.",
+    },
+    "SP668": {
+        "why": "Using argv data as a printf-family format string lets format directives read or write process memory and can lead to code execution.",
+        "attack": "An attacker supplies format directives through a command-line argument; the process interprets them instead of treating the argument as ordinary data.",
+        "false_positive": "A validated constant format or a wrapper that passes argv as a data argument is safe; this detector only recognizes direct argv use in the format position.",
+        "test": 'Use a literal format such as "%s" and pass argv as a separate argument; run with format directives and assert no memory disclosure or mutation occurs.',
+    },
+    "SP669": {
+        "why": "SharedPreferences is a plain preference store and is not an appropriate protection boundary for reusable credentials or bearer tokens.",
+        "attack": "An attacker with device backup, filesystem, or local inspection access reads a token stored in preferences and replays it against the service.",
+        "false_positive": "A token-like preference may be a non-secret demo value or an intentionally short-lived test fixture; encrypted storage wrappers and non-sensitive settings stay silent.",
+        "test": "Store credentials in platform-backed secure storage, rotate any exposed token, and assert that preference files contain no reusable authentication material.",
+    },
+    "SP670": {
+        "why": "Enabling XML DTD processing or an external resolver lets untrusted XML resolve external entities and access local or remote resources.",
+        "attack": "An attacker submits XML containing an external entity; the parser dereferences it and discloses local files or performs an internal network request.",
+        "false_positive": "Trusted offline XML with a reviewed DTD may require this setting, but request-facing parsers should use Prohibit or Ignore and a null resolver.",
+        "test": "Set DtdProcessing to Prohibit or Ignore, set XmlResolver to null, and add an XXE regression payload that must not read files or make network requests.",
+    },
     "SP096": {
         "why": "Skill files with instruction injection patterns can hijack agent behavior.",
         "attack": "Attacker crafts a skill file with hidden instructions that override the agent's intended behavior.",
@@ -3950,16 +4001,16 @@ RULE_EXPLANATIONS: dict[str, dict[str, str]] = {
         "test": "Review whether the skill genuinely needs code execution; sandbox or remove if not required.",
     },
     "SP099": {
-        "why": "Skills accessing environment credentials may exfiltrate them.",
-        "attack": "Attacker crafts a skill that reads API keys and sends them to an external endpoint.",
-        "false_positive": "Legitimate skills may need credentials for their intended function.",
-        "test": "Review whether the skill genuinely needs these credentials; scope access to minimum required.",
+        "why": "A Skill that can read a high-value environment credential gains authority beyond its natural-language instructions and increases the impact of later prompt injection or code compromise.",
+        "attack": "A compromised Skill reuses an available API token to access data or services outside the task the user approved.",
+        "false_positive": "The match proves credential access, not harvesting or exfiltration. A reviewed Skill may legitimately require a narrowly scoped token for its documented function, so this capability is advisory rather than a blocking exploit claim.",
+        "test": "Confirm the credential is documented, audience-bound, short-lived, least-privilege, and unavailable to Skill code that does not require it.",
     },
     "SP100": {
-        "why": "Skills sending data to external endpoints may exfiltrate sensitive information.",
-        "attack": "Attacker crafts a skill that sends sensitive data to external webhook endpoints.",
-        "false_positive": "Legitimate skills may need to send data to specific endpoints.",
-        "test": "Review whether the skill genuinely needs to send data externally; scope to minimum required endpoints.",
+        "why": "A Skill that posts data to a webhook or relay crosses an open-world boundary that can expose repository or user content.",
+        "attack": "A poisoned Skill posts task context or tool results to an attacker-controlled webhook.",
+        "false_positive": "A reviewed notification Skill may intentionally post bounded data to an approved webhook. The detector reports the observable outbound capability and does not claim that the payload is sensitive.",
+        "test": "Verify the destination against an allowlist and test that secrets, source files, prompts, and unrelated tool results cannot enter the outbound payload.",
     },
     "SP271": {
         "why": "MCP tools with shell execution can be exploited to run arbitrary commands.",
@@ -3998,10 +4049,10 @@ RULE_EXPLANATIONS: dict[str, dict[str, str]] = {
         "test": "Bind Ollama to localhost or add authentication; never expose model APIs publicly.",
     },
     "SP282": {
-        "why": "Ollama models from untrusted registries may contain malicious payloads.",
-        "attack": "Attacker hosts a malicious model at a non-official registry.",
-        "false_positive": "Legitimate models may be hosted at non-official registries.",
-        "test": "Only pull models from official Ollama registry; verify model integrity before use.",
+        "why": "An explicitly configured non-default Ollama registry changes the model supply-chain trust root and may serve tampered model artifacts.",
+        "attack": "An attacker changes a model reference from Ollama's default registry to a look-alike external registry that serves a malicious artifact.",
+        "false_positive": "Private registries can be legitimate. Bare names such as gemma4 and namespace names such as myteam/model stay silent because Ollama resolves them through its default registry; only an explicit non-default host is reported.",
+        "test": "Verify the registry owner and transport, pin the approved model digest where supported, and test that policy rejects unapproved registry hosts.",
     },
     "SP283": {
         "why": "ComfyUI custom nodes from external repositories may contain malicious code.",
@@ -4063,6 +4114,37 @@ class Finding:
     end_line: int | None = None
     end_column: int | None = None
     history_commit: str | None = None
+    match_confidence: str = "high"
+    tier: str = "gate"
+    scan_profile: str | None = None
+
+
+MAX_FINDINGS_PER_FILE = 5_000
+MAX_FINDINGS_TOTAL = 50_000
+
+
+class FindingLimitError(ValueError):
+    """Hard evidence limit: the scanner must not claim a verdict after truncation."""
+
+
+class BoundedFindings(list[Finding]):
+    """List-compatible finding accumulator with a deterministic per-file cap."""
+
+    def __init__(self, limit: int | None = None) -> None:
+        super().__init__()
+        self.limit = MAX_FINDINGS_PER_FILE if limit is None else limit
+
+    def append(self, item: Finding) -> None:
+        if len(self) >= self.limit:
+            raise FindingLimitError(
+                f"finding output exceeded the per-file limit of {self.limit}; "
+                "reduce scope or inspect the source manually"
+            )
+        super().append(item)
+
+    def extend(self, values: Iterable[Finding]) -> None:
+        for value in values:
+            self.append(value)
 
 
 PROOF_LEVELS = {
@@ -4202,32 +4284,35 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         "SP099",
-        "Skill file with credential harvesting pattern",
+        "Skill accesses high-value environment credential",
         "security",
-        "critical",
+        "medium",
         "high",
         compile_pattern(
-            r"""(?i)(?:process\.env|os\.environ|environ\.get|getenv)\s*\(?\s*["']"""
-            r"""(?:API_KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|AWS_SECRET|OPENAI_API_KEY|ANTHROPIC_API_KEY)["']"""
+            r"""(?ix)(?:process\.env\s*(?:\.\s*(?:API_KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|AWS_SECRET|OPENAI_API_KEY|ANTHROPIC_API_KEY)\b|\[\s*["'](?:API_KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|AWS_SECRET|OPENAI_API_KEY|ANTHROPIC_API_KEY)["']\s*\])|"""
+            r"""os\.environ\s*\[\s*["'](?:API_KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|AWS_SECRET|OPENAI_API_KEY|ANTHROPIC_API_KEY)["']\s*\]|"""
+            r"""(?:os\.)?(?:environ\.get|getenv)\s*\(\s*["'](?:API_KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|AWS_SECRET|OPENAI_API_KEY|ANTHROPIC_API_KEY)["'])"""
         ),
-        "A skill file accesses environment credentials, potentially exfiltrating them.",
-        "Review whether the skill genuinely needs these credentials; scope access to minimum required.",
-        "CWE-200",
+        "A Skill reads a high-value environment credential, expanding the authority available to its code.",
+        "Document the credential need and provide a short-lived, audience-bound, least-privilege token only to the code that requires it.",
+        "CWE-272",
         "OWASP ASVS V14",
-        frozenset({".md", ".py", ".js"}),
+        frozenset({".md", ".py", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx"}),
     ),
     Rule(
         "SP100",
-        "Skill file with network exfiltration pattern",
+        "Skill posts data to webhook endpoint",
         "security",
-        "high",
+        "medium",
         "medium",
         compile_pattern(
-            r"""(?i)(?:fetch|http\.request|requests\.post|axios\.post|urllib\.request)\s*\(?\s*["']https?://"""
-            r"""[^"']*(?:api\.openai|api\.anthropic|hooks\.slack|discord\.com/api/webhooks|webhook)[^"']*["']"""
+            r"""(?is)(?:(?:requests\.post|axios\.post)\s*\(?\s*["']https?://"""
+            r"""[^"']*(?:hooks\.slack\.com|discord\.com/api/webhooks|(?:^|[./_-])webhooks?(?:[./?_-]|$))[^"']*["']|"""
+            r"""fetch\s*\(\s*["']https?://[^"']*(?:hooks\.slack\.com|discord\.com/api/webhooks|(?:^|[./_-])webhooks?(?:[./?_-]|$))[^"']*["']"""
+            r"""[\s\S]{0,300}?\bmethod\s*:\s*["']POST["'])"""
         ),
-        "A skill file sends data to external webhook or API endpoints, potentially exfiltrating data.",
-        "Review whether the skill genuinely needs to send data externally; scope to minimum required endpoints.",
+        "A Skill posts data to a webhook or relay endpoint, creating an externally visible side effect.",
+        "Allowlist the destination and constrain the payload so secrets, source files, prompts, and unrelated tool output cannot be sent.",
         "CWE-200",
         "OWASP ASVS V14",
         frozenset({".md", ".py", ".js"}),
@@ -4317,7 +4402,8 @@ RULES: tuple[Rule, ...] = (
         frozenset({".mjs", ".js", ".ts"}),
     ),
     # ------------------------------------------------------------------
-    # AI Framework CVE Rules (Ollama, ComfyUI, vLLM)
+    # AI framework security posture rules (Ollama, ComfyUI, vLLM).
+    # These inspect local configuration; they do not claim deployed CVE matches.
     # ------------------------------------------------------------------
     Rule(
         "SP281",
@@ -4336,13 +4422,17 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         "SP282",
-        "Ollama model pulled from untrusted registry",
+        "Ollama model uses explicit non-default registry",
         "security",
         "high",
         "medium",
-        compile_pattern(r"""(?i)ollama\s+(?:pull|run)\s+(?!(?:library/|ollama/))[\w\-./]+"""),
-        "Ollama pulls or runs a model from a non-official registry, potentially loading a malicious model.",
-        "Only pull models from official Ollama registry; verify model integrity before use.",
+        compile_pattern(
+            r"""(?i)\bollama\s+(?:pull|run)\s+(?:https?://)?"""
+            r"""(?!registry\.ollama\.ai(?:/|:443/))"""
+            r"""(?:localhost(?::\d+)?|(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?)/[\w./:-]+"""
+        ),
+        "Ollama pulls or runs a model from an explicitly named non-default registry host.",
+        "Allowlist the registry host and verify the approved model digest before use.",
         "CWE-494",
         "OWASP ASVS V14",
         frozenset({".sh", ".bash", ".md", ".txt"}),
@@ -5698,7 +5788,7 @@ RULES: tuple[Rule, ...] = (
         "high",
         "medium",
         compile_pattern(
-            r"""(?:execute|query|raw)\s*\(\s*(?:f["']|`[^`]*\$\{|["'][^"']*["']\s*%|[^,]+\.format\(|["'][^"']*["']\s*\+\s*(?:[A-Za-z_$]|["']))"""
+            r"""(?:execute|query|raw)\s*\(\s*(?:f["']|\$["'][^"']*\{|`[^`]*\$\{|["'][^"']*["']\s*%|[^,\x0a]{0,512}\.format\(|["'][^"']*["']\s*\+\s*(?:[A-Za-z_$]|["']))"""
         ),
         "A database query appears to be built with string interpolation.",
         "Use parameterized queries or the ORM's bound parameters and add an injection regression test.",
@@ -5712,7 +5802,9 @@ RULES: tuple[Rule, ...] = (
         "security",
         "high",
         "high",
-        compile_pattern(r"""\b(?:verify|rejectUnauthorized)\s*[:=]\s*(?:false|False)\b"""),
+        compile_pattern(
+            r"""(?:\b(?:verify|rejectUnauthorized)\s*[:=]\s*(?:false|False)\b|\bbadCertificateCallback\s*=\s*\([^)]*\)\s*=>\s*true\b|\bServerCertificateCustomValidationCallback\s*=\s*\([^)]*\)\s*=>\s*true\b|\bServerCertificateCustomValidationCallback\s*=\s*HttpClientHandler\.DangerousAcceptAnyServerCertificateValidator\b|\bSecurityContext\s*\(\s*withTrustedRoots\s*:\s*false\b)"""
+        ),
         "TLS peer verification is explicitly disabled.",
         "Restore certificate verification and configure the correct trust chain.",
         "CWE-295",
@@ -5782,7 +5874,7 @@ RULES: tuple[Rule, ...] = (
         "high",
         "medium",
         compile_pattern(
-            r"""(?:(?:get|post|put|delete|request|head)\s*\(\s*["'`]https?://(?:169\.254\.169\.254|metadata\.google\.internal|127\.0\.0\.1|localhost)|(?:requests|httpx|fetch|axios|http)\.(?:get|post|put|delete|request)\s*\(\s*(?:req\.query|request\.args|req\.body|user_url|user_input)\b)"""
+            r"""(?:(?:get|post|put|delete|request|head)\s*\(\s*["'`]https?://(?:169\.254\.169\.254|metadata\.google\.internal|127\.0\.0\.1|localhost)|(?:requests|httpx|fetch|axios|http)\.(?:get|post|put|delete|request)\s*\(\s*(?:req\.query|request\.args|req\.body|user_url|user_input)\b|(?:httpClient|_?client)\.(?:GetAsync|GetStringAsync|PostAsync|SendAsync)\s*\(\s*(?:Request|request)\.(?:Query|Form|Headers)\b|\bnew\s+HttpRequestMessage\s*\([^,]+,\s*(?:Request|request)\.(?:Query|Form|Headers)\b)"""
         ),
         "An outbound HTTP request may target internal endpoints, localhost, or cloud metadata.",
         "Validate destination URLs against an allowlist and block private IP ranges.",
@@ -5797,7 +5889,7 @@ RULES: tuple[Rule, ...] = (
         "high",
         "medium",
         compile_pattern(
-            r"""(?:(?<![\w.$])open\s*\(\s*(?:f["'][^"']*\{|`[^`]*\$\{)|(?:fs\.)?(?:readFile|readFileSync|writeFileSync|createReadStream|unlink|rmSync)\s*\(\s*`[^`]*\$\{|(?:path\.)?join\s*\([^)]*(?:req\.|params|query|user_input))"""
+            r"""(?:(?<![\w.$])open\s*\(\s*(?:f["'][^"']*\{|`[^`]*\$\{)|(?:fs\.)?(?:readFile|readFileSync|writeFileSync|createReadStream|unlink|rmSync)\s*\(\s*`[^`]*\$\{|(?:path\.)?join\s*\([^)]*(?:req\.|params|query|user_input)|(?:Path|path)\.Combine\s*\([^)]*(?:Request|request|Query|Form|Route))"""
         ),
         "A filesystem operation constructs paths directly from variables without visible normalization.",
         "Normalize with realpath/resolve and verify the path remains inside the base directory.",
@@ -5949,12 +6041,14 @@ RULES: tuple[Rule, ...] = (
         "security",
         "medium",
         "medium",
-        compile_pattern(r"""redirect\s*\(\s*(?:req|request)\s*\."""),
+        compile_pattern(
+            r"""(?:redirect(?:Permanent|PreserveMethod)?\s*\(\s*(?:req|request)\s*\.|Redirect(?:Permanent|PreserveMethod)?\s*\(\s*(?:Request|request)\.(?:Query|Form|Headers)\b|Results\.Redirect\s*\(\s*(?:Request|request)\.(?:Query|Form|Headers)\b)"""
+        ),
         "A redirect target is taken directly from request input, enabling open-redirect phishing attacks.",
         "Redirect only to validated allowlisted paths or relative URLs.",
         "CWE-601",
         "OWASP ASVS V5",
-        frozenset({".js", ".py", ".ts", ".mjs", ".jsx", ".cjs"}),
+        frozenset({".js", ".py", ".ts", ".mjs", ".jsx", ".cjs", ".cs"}),
     ),
     Rule(
         "SP122",
@@ -6226,7 +6320,7 @@ RULES: tuple[Rule, ...] = (
         "high",
         "high",
         compile_pattern(
-            r"""(?:srand\s*\(\s*(?:time|getpid)\b|random\.seed\s*\(\s*(?:time\.time|int\(time\)|None)?\s*\))"""
+            r"""(?:srand\s*\(\s*(?:time|getpid)\b|random\.seed\s*\(\s*(?:time\.time(?:\s*\(\s*\))?|int\s*\(\s*time(?:\.time(?:\s*\(\s*\))?)?\s*\)|None)?\s*\))"""
         ),
         "A pseudo-random number generator is seeded with predictable timestamp values.",
         "Use cryptographically secure PRNGs without manual timestamp seeding.",
@@ -6558,7 +6652,7 @@ RULES: tuple[Rule, ...] = (
         "security",
         "high",
         "high",
-        compile_pattern(r"""\.raw\s*\(\s*(?:f["']|["'][^"']*%[s(]|[^,]+\.format\()"""),
+        compile_pattern(r"""\.raw\s*\(\s*(?:f["']|["'][^"']*["']\s*%|[^,]+\.format\()"""),
         "Django ORM raw() query constructed with dynamic string formatting instead of query parameters.",
         "Pass query parameters as a list argument to raw(query, [params]).",
         "CWE-89",
@@ -7310,8 +7404,8 @@ RULES: tuple[Rule, ...] = (
         "high",
         "high",
         compile_pattern(r"""\.env(?:\.local|\.production|\.secret|\.staging)?$"""),
-        "A sensitive environment file (.env, .env.production) is committed and tracked in git source control.",
-        "Add .env* to .gitignore and remove the file from git history using git rm --cached.",
+        "Git evidence contains a sensitive environment filename. Verify whether the file contains secrets and whether it was published.",
+        "Ignore private environment files and remove them from the Git index. git rm --cached does not erase history; rotate confirmed exposed credentials and assess history cleanup separately.",
         "CWE-798",
         "OWASP ASVS V14",
         redact=True,
@@ -8023,7 +8117,7 @@ RULES: tuple[Rule, ...] = (
         "scale",
         "medium",
         "low",
-        compile_pattern(r"""\bSELECT\s+\*\s+FROM\b(?![^;\n]*\bLIMIT\b)"""),
+        compile_pattern(r"""\bSELECT\s+\*\s+FROM\b(?![^;\x0a]{0,512}\bLIMIT\b)"""),
         "A query may return an unbounded, over-wide result set.",
         "Select required columns and enforce pagination or a defensible upper bound.",
         "CWE-400",
@@ -11818,13 +11912,13 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         "SP583",
-        "BullMQ job worker instantiated without stalledInterval configuration",
+        "BullMQ worker explicitly disables stalled checks",
         "reliability",
         "medium",
         "high",
-        compile_pattern(r"""new\s+Worker\s*\([^\)]+(?!stalledInterval)[^\)]*\)"""),
-        "BullMQ worker without stalledInterval may delay recovering jobs from crashed or killed worker processes.",
-        "Set `stalledInterval: 30000` and `maxStalledCount: 2` in Worker options.",
+        compile_pattern(r"""\bskipStalledCheck\s*:\s*true\b"""),
+        "A BullMQ Worker explicitly disables its stalled checker; verify whether another worker owns recovery.",
+        "Remove skipStalledCheck: true to retain BullMQ's default checks, or document and test a dedicated recovery worker.",
         "CWE-703",
         "Reliability",
         frozenset({".js", ".ts"}),
@@ -12019,12 +12113,12 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         "SP597",
-        "Next.js Server Component sequential waterfall requests blocking initial SSR",
+        "Next.js Server Component has adjacent sequential independent fetches",
         "scale",
         "high",
         "high",
         compile_pattern(r"""\bawait\s+fetch\s*\("""),
-        "Sequential await fetch calls in Server Components multiply SSR latency and delay First Contentful Paint (FCP).",
+        "Adjacent awaits on distinct literal default-GET URLs serialize this component's uncached fetch work; cache and rendering mode determine user impact.",
         "Parallelize independent fetches using Promise.all([fetch1, fetch2]) or wrap in <Suspense> boundaries.",
         "CWE-400",
         "Performance",
@@ -12045,14 +12139,14 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         "SP599",
-        "TypeScript non-null assertion used on dynamic API response payload",
+        "Unchecked JSON field is dereferenced through a TypeScript non-null assertion",
         "reliability",
         "high",
         "high",
         compile_pattern(
             r"""\b(?:res|response|data|json|payload)\.[a-zA-Z0-9_]+!|\.[a-zA-Z0-9_]+!\s*(?:;|\n|$)"""
         ),
-        "Using non-null assertions (!) on dynamic API responses leads to unhandled TypeError exceptions if fields are missing.",
+        "A field from a local json() result is immediately dereferenced through a non-null assertion without a visible validation step; missing fields may throw.",
         "Use Zod validation or optional chaining (?.) with nullish coalescing defaults (??).",
         "CWE-476",
         "Reliability",
@@ -12395,13 +12489,13 @@ RULES: tuple[Rule, ...] = (
         "high",
         "high",
         compile_pattern(
-            r"""(?:token|secret|password|key|reset_code)\s*=\s*(?:Math\.random\(\)|random\.random\(\)|rand\.Intn\()"""
+            r"""(?:token|secret|password|key|reset[_-]?code|otp)\s*[:=]\s*(?:Math\.random\(\)|random\.random\(\)|rand\.Intn\(|Random\(\)\.(?:nextInt|nextDouble)\s*\()"""
         ),
         "Using non-cryptographic PRNGs (Math.random(), random.random()) for security tokens makes them predictable and forgeable.",
         "Use cryptographically secure random generators: crypto.randomBytes() or secrets.token_hex().",
         "CWE-327",
         "OWASP ASVS V6",
-        frozenset({".js", ".ts", ".py", ".go", ".java", ".cs", ".php"}),
+        frozenset({".js", ".ts", ".py", ".go", ".java", ".cs", ".php", ".dart"}),
     ),
     Rule(
         "SP625",
@@ -12485,14 +12579,14 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         "SP631",
-        "Node.js native module imported in Edge or Serverless runtime",
+        "Node.js native module imported with explicit Edge runtime",
         "reliability",
         "critical",
         "high",
         compile_pattern(
             r"""import\s+.*?from\s+["'](?:node:)?(?:fs|child_process|cluster|dgram|v8)["']"""
         ),
-        "Importing Node.js native filesystem or child_process modules in Edge/Serverless runtimes causes runtime crashes as these APIs do not exist.",
+        "An explicit Edge runtime declaration imports a native Node.js module that is unavailable in Next.js Edge.",
         "Use Edge-compatible Web Standard APIs (Fetch, Streams, Web Crypto) instead of node:fs / node:child_process.",
         "CWE-664",
         "Reliability",
@@ -12966,6 +13060,82 @@ RULES: tuple[Rule, ...] = (
         "OWASP ASVS V14",
         frozenset({".py"}),
     ),
+    Rule(
+        "SP666",
+        "PHP upload allowlist trusts browser MIME metadata",
+        "security",
+        "medium",
+        "low",
+        compile_pattern(
+            r"""(?:if\s*\([^\n]*\$_FILES\[[^\]]+\]\[['\"]type['\"]\]|in_array\s*\(\s*\$_FILES\[[^\]]+\]\[['\"]type['\"]\])"""
+        ),
+        "A PHP upload decision uses the browser-supplied MIME metadata instead of validating file content.",
+        "Use finfo or content-based validation on the temporary file, then enforce a safe destination and extension policy.",
+        "CWE-434",
+        "OWASP ASVS V5",
+        frozenset({".php"}),
+    ),
+    Rule(
+        "SP667",
+        "Go sensitive cookie without explicit HttpOnly",
+        "security",
+        "medium",
+        "low",
+        re.compile(
+            r"""(?:http\.)?SetCookie\s*\([^,]+,\s*&(?:http\.)?Cookie\s*\{(?=[^}]*Name\s*:\s*[\"'](?:session|auth|token|jwt|refresh)[\"'])(?:(?!HttpOnly\s*:\s*true)[^}])*\}\s*\)""",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "A sensitive Go cookie literal omits an explicit HttpOnly flag, leaving the session value readable by script.",
+        "Set HttpOnly: true together with Secure and an appropriate SameSite policy, or document a deliberate non-sensitive cookie.",
+        "CWE-1004",
+        "OWASP ASVS V3",
+        frozenset({".go"}),
+    ),
+    Rule(
+        "SP668",
+        "C/C++ format string taken directly from argv",
+        "security",
+        "medium",
+        "medium",
+        compile_pattern(
+            r"""(?:(?:printf|syslog)\s*\(\s*argv\s*\[[^\]]+\]|fprintf\s*\(\s*[^,]+,\s*argv\s*\[[^\]]+\]|sprintf\s*\(\s*[^,]+,\s*argv\s*\[[^\]]+\]|snprintf\s*\(\s*[^,]+,\s*[^,]+,\s*argv\s*\[[^\]]+\])"""
+        ),
+        "A C/C++ formatted-output call receives an attacker-controlled argv value as its format string.",
+        'Use a constant format string such as "%s" and pass argv as data; validate command-line inputs before use.',
+        "CWE-134",
+        "CERT C FIO30-C",
+        frozenset({".c", ".cc", ".cpp", ".h", ".hpp"}),
+    ),
+    Rule(
+        "SP669",
+        "Dart credential stored in SharedPreferences",
+        "security",
+        "medium",
+        "low",
+        compile_pattern(
+            r"""(?:SharedPreferences|\bprefs\b)\s*\.\s*setString\s*\(\s*["'](?:token|access[_-]?token|refresh[_-]?token|password|secret|api[_-]?key)["']"""
+        ),
+        "A Dart preference write stores a credential-like value in SharedPreferences, which is not a secure secret store.",
+        "Use platform secure storage or an approved encrypted vault for credentials and tokens; keep preferences for non-sensitive settings.",
+        "CWE-922",
+        "OWASP ASVS V6",
+        frozenset({".dart"}),
+    ),
+    Rule(
+        "SP670",
+        "C# XML parser enables DTD or external resolution",
+        "security",
+        "medium",
+        "low",
+        compile_pattern(
+            r"""(?:DtdProcessing\s*=\s*DtdProcessing\.Parse|XmlResolver\s*=\s*new\s+(?:XmlUrlResolver|XmlSecureResolver))"""
+        ),
+        "A C# XML parser configuration enables DTD processing or an external resolver, creating an XXE risk for untrusted XML.",
+        "Use DtdProcessing.Prohibit or Ignore, set XmlResolver to null, and parse untrusted XML with bounded input and explicit types.",
+        "CWE-611",
+        "OWASP ASVS V5",
+        frozenset({".cs"}),
+    ),
 )
 
 # Secret rules are exactly the rules that redact credential material in evidence.
@@ -13126,11 +13296,114 @@ def rule_gates() -> dict[str, LiteralGate]:
 
 
 DATABASE_SUFFIXES = {".sqlite", ".sqlite3", ".db"}
+REPARSE_POINT_ATTRIBUTE = getattr(stat_module, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+
+
+def is_link_or_reparse(metadata: os.stat_result) -> bool:
+    """Include Windows junctions even on Python versions without Path.is_junction."""
+    return stat_module.S_ISLNK(metadata.st_mode) or bool(
+        getattr(metadata, "st_file_attributes", 0) & REPARSE_POINT_ATTRIBUTE
+    )
+
+
+# Content-bearing container formats. Members stay omitted unless
+# --inspect-archives is set, and even then only ZIP-based suffixes are opened
+# in memory with hard member/byte/ratio bounds (see archive_inspect).
+CONTAINER_SUFFIXES = frozenset(
+    {
+        ".zip",
+        ".docx",
+        ".xlsx",
+        ".pptx",
+        ".jar",
+        ".war",
+        ".apk",
+        ".ipa",
+        ".aab",
+        ".whl",
+        ".egg",
+        ".tar",
+        ".gz",
+        ".tgz",
+        ".bz2",
+        ".xz",
+        ".zst",
+        ".7z",
+        ".rar",
+    }
+)
+
+# Known static assets, compiled artifacts, and generated reports: deliberately
+# out of scope for a source scanner, counted for visibility but never treated
+# as omitted content.
+ASSET_SUFFIXES = frozenset(
+    {
+        ".sarif",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".svg",
+        ".ico",
+        ".bmp",
+        ".tif",
+        ".tiff",
+        ".avif",
+        ".heic",
+        ".mp3",
+        ".mp4",
+        ".mov",
+        ".avi",
+        ".mkv",
+        ".webm",
+        ".wav",
+        ".flac",
+        ".ogg",
+        ".pdf",
+        ".psd",
+        ".ai",
+        ".sketch",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".otf",
+        ".eot",
+        ".pyc",
+        ".pyo",
+        ".class",
+        ".so",
+        ".dll",
+        ".dylib",
+        ".exe",
+        ".wasm",
+        ".coverage",
+    }
+)
 
 
 def is_text_file(path: Path) -> bool:
     suffix = path.suffix.lower()
-    return suffix in TEXT_SUFFIXES or suffix in DATABASE_SUFFIXES or path.name.lower() in TEXT_NAMES
+    return (
+        suffix in TEXT_SUFFIXES
+        or suffix in DATABASE_SUFFIXES
+        or path.name.lower() in TEXT_NAMES
+        or _is_sensitive_env_path(path.name)
+    )
+
+
+def classify_unscannable(path: Path) -> str:
+    """Return why a non-text file is outside the scanner's scope."""
+    suffix = path.suffix.lower()
+    if suffix in DATABASE_SUFFIXES:
+        return "database"
+    if suffix in CONTAINER_SUFFIXES:
+        return "container"
+    if suffix in ASSET_SUFFIXES:
+        return "asset"
+    if path.name.lower() in {".coverage"}:
+        return "asset"
+    return "binary"
 
 
 def scanner_file_kind(path: Path) -> str:
@@ -13170,38 +13443,161 @@ def iter_scannable_files(
     root: Path,
     max_file_bytes: int,
     exclude_patterns: Sequence[str] = (),
-) -> Iterable[Path]:
-    """Walk deterministically while pruning ignored trees before descending into them."""
-    for directory, subdirectories, filenames in os.walk(root, topdown=True, onerror=lambda _: None):
+    include_paths: frozenset[str] | None = None,
+    tracked_paths: frozenset[str] | None = None,
+) -> Iterable[tuple[Path, str, str | None]]:
+    """Walk deterministically while pruning unselected ignored trees.
+
+    Yields ``(path, relative_path, skip_reason)``. A ``None`` skip reason means
+    the file is in scope for content scanning; otherwise the reason is one of
+    the coverage-ledger categories (``symlink``, ``unreadable``, ``excluded``,
+    ``size``, ``database``, ``container``, ``asset``, ``binary``).
+
+    Dependency/build trees remain cheap by default, but repository scans can
+    pass Git-index paths (and/or an explicit changed-file selection) so a
+    tracked file inside one of those trees is not silently skipped. ``None``
+    preserves the historical pruning behavior for callers without Git
+    evidence.
+    """
+    walk_errors = 0
+    selected_paths = set(tracked_paths or ())
+    selected_paths.update(include_paths or ())
+    ignored_file_selection = (
+        set(include_paths) if include_paths is not None else set(tracked_paths or ())
+    )
+    selected_directories: set[str] = set()
+    for selected_path in selected_paths:
+        normalized = selected_path.replace("\\", "/").strip("/")
+        if not normalized or normalized == ".":
+            continue
+        parts = normalized.split("/")
+        selected_directories.add(normalized)
+        selected_directories.update("/".join(parts[:index]) for index in range(1, len(parts)))
+
+    def record_walk_error(error: OSError) -> None:
+        nonlocal walk_errors
+        try:
+            relative = Path(error.filename).relative_to(root).as_posix()
+        except (TypeError, ValueError):
+            relative = "."
+        if not is_excluded(relative, exclude_patterns) and _coverage_path_selected(
+            relative, include_paths, directory=True
+        ):
+            walk_errors += 1
+
+    for directory, subdirectories, filenames in os.walk(
+        root, topdown=True, onerror=record_walk_error, followlinks=False
+    ):
         relative_directory = Path(directory).relative_to(root)
+        inside_ignored_tree = any(part in SKIP_DIRS for part in relative_directory.parts)
         subdirectories[:] = sorted(
             name
             for name in subdirectories
-            if name not in SKIP_DIRS
+            if (
+                (not inside_ignored_tree and name not in SKIP_DIRS)
+                or (
+                    (tracked_paths is not None or include_paths is not None)
+                    and (relative_directory / name).as_posix() in selected_directories
+                )
+            )
             and not is_excluded(
                 (relative_directory / name).as_posix().removeprefix("./"),
                 exclude_patterns,
             )
         )
+        for name in tuple(subdirectories):
+            child = Path(directory, name)
+            try:
+                child_stat = os.lstat(child)
+            except OSError as exc:
+                subdirectories.remove(name)
+                record_walk_error(exc)
+                continue
+            if is_link_or_reparse(child_stat):
+                subdirectories.remove(name)
+                if _coverage_path_selected(
+                    child.relative_to(root).as_posix(), include_paths, directory=True
+                ):
+                    yield child, child.relative_to(root).as_posix(), "symlink"
         for filename in sorted(filenames):
             path = Path(directory, filename)
+            relative_path = path.relative_to(root).as_posix()
+            # Once a conventionally ignored tree is retained for a tracked or
+            # explicitly selected path, do not fan back out into its entire
+            # untracked dependency/build output. This keeps the Git-index
+            # escape hatch bounded to the files that justified descending.
+            if (
+                inside_ignored_tree
+                and (tracked_paths is not None or include_paths is not None)
+                and relative_path not in ignored_file_selection
+            ):
+                continue
+            if is_excluded(relative_path, exclude_patterns):
+                yield path, relative_path, "excluded"
+                continue
             try:
                 file_stat = os.lstat(path)
             except OSError:
+                yield path, path.relative_to(root).as_posix(), "unreadable"
                 continue
-            if stat_module.S_ISLNK(file_stat.st_mode):
+            if is_link_or_reparse(file_stat):
+                yield path, path.relative_to(root).as_posix(), "symlink"
+                continue
+            if not stat_module.S_ISREG(file_stat.st_mode):
+                yield path, relative_path, "unreadable"
+                continue
+            # Artifact detection needs only the fixed SQLite header, regardless
+            # of the database size; database contents are never analyzed.
+            if path.suffix.lower() in DATABASE_SUFFIXES:
+                yield path, relative_path, None
                 continue
             if not is_text_file(path):
-                continue
-            relative_path = path.relative_to(root).as_posix()
-            if is_excluded(relative_path, exclude_patterns):
+                yield path, relative_path, classify_unscannable(path)
                 continue
             if file_stat.st_size <= max_file_bytes:
-                yield path
+                yield path, relative_path, None
+            elif inside_ignored_tree:
+                # Git-index/include hatches re-enter skip trees for tracked
+                # source. Oversized catalogs in those trees stay omitted without
+                # failing the completeness gate of the selected application.
+                yield path, relative_path, "excluded"
+            else:
+                yield path, relative_path, "size"
+    # Keep only a count: a tree full of denied directories must not allocate an
+    # unbounded diagnostic/path list. Errors are already scoped by the callback.
+    for _ in range(walk_errors):
+        yield root, "", "walk_error"
+
+
+def _coverage_path_selected(
+    relative_path: str, include_paths: frozenset[str] | None, *, directory: bool = False
+) -> bool:
+    if include_paths is None:
+        return True
+    if not directory:
+        return relative_path in include_paths
+    prefix = "" if relative_path in {"", "."} else relative_path.rstrip("/") + "/"
+    return relative_path in include_paths or any(path.startswith(prefix) for path in include_paths)
+
+
+def terminal_safe_text(value: object) -> str:
+    """Neutralize C0/C1 and escape bytes before putting untrusted text on stdout."""
+    text = str(value)
+    safe: list[str] = []
+    for character in text:
+        codepoint = ord(character)
+        if codepoint < 0x20 or codepoint == 0x7F or 0x80 <= codepoint <= 0x9F:
+            if character in {"\n", "\t"}:
+                safe.append(" ")
+            else:
+                safe.append(f"\\x{codepoint:02x}")
+        else:
+            safe.append(character)
+    return "".join(safe)
 
 
 def clean_evidence(line: str, redact: bool) -> str:
-    compact = line.strip().replace("\t", " ")[:240]
+    compact = terminal_safe_text(line.strip().replace("\t", " "))[:240]
     return "[REDACTED: credential-like material]" if redact else compact
 
 
@@ -13355,6 +13751,7 @@ TEST_PATH_SEGMENTS = frozenset(
         "sample",
         "benchmarks",
         "benchmark",
+        "fixtures",
     }
 )
 
@@ -13399,6 +13796,20 @@ MINIFIED_FILE_NAME = re.compile(
 )
 
 
+EVAL_DATASET_FILENAMES = frozenset(
+    {
+        "evals.json",
+        "evals.jsonl",
+        "evals.yaml",
+        "evals.yml",
+        "dataset.json",
+        "dataset.jsonl",
+        "dataset.yaml",
+        "dataset.yml",
+    }
+)
+
+
 @lru_cache(maxsize=8192)
 def determine_scope(relative_path: str) -> str:
     normalized = relative_path.replace("\\", "/").removeprefix("./").lower()
@@ -13406,11 +13817,29 @@ def determine_scope(relative_path: str) -> str:
     if any(part in TEST_PATH_SEGMENTS for part in parts[:-1]):
         return "test"
     filename = parts[-1]
+    # Authored eval datasets hold prompts, expected outputs, and ground-truth
+    # strings; they are test data, not executable skill logic.
+    if filename in EVAL_DATASET_FILENAMES and any(part in {"evals", "eval"} for part in parts[:-1]):
+        return "test"
     stem = Path(filename).stem
+    suffixes = "".join(Path(filename).suffixes).lower()
     if (
         filename.startswith("test_")
         or stem.startswith("test_")
-        or stem.endswith(("_test", ".test", ".spec", "_spec"))
+        or stem.endswith(("_test", "_tests", ".test", ".spec", "_spec"))
+        or filename in {"conftest.py", "conftest.js", "conftest.ts", "conftest.jsx", "conftest.tsx"}
+        or suffixes.endswith(
+            (
+                ".test.js",
+                ".test.ts",
+                ".test.jsx",
+                ".test.tsx",
+                ".spec.js",
+                ".spec.ts",
+                ".spec.jsx",
+                ".spec.tsx",
+            )
+        )
     ):
         return "test"
     return "app"
@@ -13473,10 +13902,12 @@ def make_finding(
         end_line,
         end_column,
         history_commit,
+        match_confidence=base_confidence,
+        tier="advisory" if rule.rule_id in precision_policy.ADVISORY_RULE_IDS else "gate",
     )
 
 
-DOCUMENT_SCAN_RULE_IDS = frozenset(
+SKILL_RULE_IDS = frozenset(
     {
         "SP096",
         "SP097",
@@ -13485,6 +13916,74 @@ DOCUMENT_SCAN_RULE_IDS = frozenset(
         "SP100",
     }
 )
+
+# Documents are normally excluded from executable-code rules. Skill rules are
+# the narrow exception, but only after the caller has established that the
+# document belongs to a declared Agent Skill package.
+DOCUMENT_SCAN_RULE_IDS = SKILL_RULE_IDS
+
+
+def has_skill_path_context(relative_path: str) -> bool:
+    """Infer explicit Skill ownership for in-memory/direct scanner callers."""
+
+    normalized = relative_path.replace("\\", "/").strip("/")
+    parts = tuple(part.casefold() for part in normalized.split("/") if part)
+    if not parts:
+        return False
+    if parts[-1] == "skill.md":
+        return True
+    return "skills" in parts[:-1]
+
+
+def is_within_skill_root(relative_path: str, skill_roots: frozenset[str]) -> bool:
+    """Return whether a repository path belongs to a discovered Skill package."""
+
+    normalized = relative_path.replace("\\", "/").strip("/").casefold()
+    for root in skill_roots:
+        if not root or normalized == root or normalized.startswith(root + "/"):
+            return True
+    return False
+
+
+def discover_skill_roots(root: Path, exclude_patterns: Sequence[str]) -> frozenset[str]:
+    """Discover Skill descriptors independently of file-size and file-only excludes."""
+
+    roots: set[str] = set()
+    for directory, subdirectories, filenames in os.walk(root, topdown=True, onerror=lambda _: None):
+        relative_directory = Path(directory).relative_to(root)
+        subdirectories[:] = sorted(
+            name
+            for name in subdirectories
+            if name not in SKIP_DIRS
+            and not is_excluded(
+                (relative_directory / name).as_posix().removeprefix("./"),
+                exclude_patterns,
+            )
+        )
+        for name in tuple(subdirectories):
+            try:
+                linked = is_link_or_reparse(os.lstat(Path(directory, name)))
+            except OSError:
+                linked = True
+            if linked:
+                subdirectories.remove(name)
+        descriptor_name = next(
+            (name for name in filenames if name.casefold() == "skill.md"),
+            None,
+        )
+        if descriptor_name is None:
+            continue
+        descriptor = Path(directory, descriptor_name)
+        try:
+            descriptor_stat = os.lstat(descriptor)
+        except OSError:
+            continue
+        if not stat_module.S_ISREG(descriptor_stat.st_mode) or is_link_or_reparse(descriptor_stat):
+            continue
+        parent = relative_directory.as_posix().casefold()
+        roots.add("" if parent == "." else parent)
+    return frozenset(roots)
+
 
 MCP_RULE_IDS = frozenset({"SP271", "SP272", "SP273", "SP274", "SP275"})
 MCP_SOURCE_SIGNAL = re.compile(
@@ -13504,6 +14003,10 @@ def has_mcp_context(relative_path: str, source_text: str) -> bool:
 
 FILE_LEVEL_RULE_IDS = frozenset(
     {
+        "SP210",
+        "SP220",
+        "SP583",
+        "SP599",
         "SP107",
         "SP131",
         "SP108",
@@ -13563,6 +14066,454 @@ def applicable_line_rules(
     return resolved
 
 
+def github_run_expression_lines(source_text: str) -> list[int]:
+    """Recognize ordinary workflow step run scalars, not env/with/prose.
+
+    This is intentionally a narrow YAML reader: block mappings, sequence steps,
+    quoted keys, and literal/folded/quoted run scalars. Flow maps and aliases are
+    not resolved. Block/quoted scalar contents cannot create new YAML keys.
+    """
+    stack: list[tuple[int, str]] = []
+    scalar_indent: int | None = None
+    scalar_run = False
+    quote: str | None = None
+    result: list[int] = []
+    pattern = find_rule("SP210").pattern
+
+    def scalar_text(value: str, active_quote: str | None = None) -> tuple[str, str | None]:
+        index = 0
+        while index < len(value):
+            char = value[index]
+            if active_quote:
+                if char == "\\" and active_quote == '"':
+                    index += 2
+                    continue
+                if char == active_quote:
+                    if active_quote == "'" and value[index : index + 2] == "''":
+                        index += 2
+                        continue
+                    active_quote = None
+            elif char in {'"', "'"}:
+                active_quote = char
+            elif char == "#" and (index == 0 or value[index - 1].isspace()):
+                return value[:index], active_quote
+            index += 1
+        return value, active_quote
+
+    for line_number, line in enumerate(source_text.splitlines(), 1):
+        if quote is not None:
+            value, quote = scalar_text(line, quote)
+            if scalar_run and pattern.search(value):
+                result.append(line_number)
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if scalar_indent is not None:
+            if not line.strip() or indent > scalar_indent:
+                if scalar_run and pattern.search(line):
+                    result.append(line_number)
+                continue
+            scalar_indent = None
+        match = re.match(r"""^( *)(?:- +)?(?:([\w-]+)|"([\w-]+)"|'([\w-]+)')\s*:\s*(.*)$""", line)
+        if match is None:
+            continue
+        key = next(value for value in match.group(2, 3, 4) if value is not None)
+        key_indent = line.index(key)
+        while stack and stack[-1][0] >= key_indent:
+            stack.pop()
+        ancestors = [item[1] for item in stack]
+        scalar_run = (
+            key == "run"
+            and len(ancestors) == 3
+            and ancestors[0] == "jobs"
+            and ancestors[2] == "steps"
+        )
+        raw_value = match.group(5)
+        value, end_quote = scalar_text(raw_value)
+        if re.fullmatch(r"[|>][1-9+-]{0,2}\s*", value):
+            scalar_indent = key_indent
+        else:
+            if scalar_run and pattern.search(value):
+                result.append(line_number)
+            # Only a quote at the start creates a YAML quoted scalar. Shell
+            # quotes in a plain run command do not consume subsequent YAML.
+            quote = end_quote if raw_value.startswith(('"', "'")) else None
+        if not value.strip():
+            stack.append((key_indent, key))
+    return result
+
+
+def js_context_tokens(source: str) -> list[tuple[str, int]]:
+    """Small bounded lexical view for precision checks, not a JS parser.
+
+    Comments, strings, and regex literals remain opaque. Template interpolation
+    and excessive token counts are unresolved, never affirmative evidence.
+    """
+    tokens: list[tuple[str, int]] = []
+    paren_context: list[str] = []
+    regex_after_control = False
+    index = 0
+    token_pattern = re.compile(
+        r"[A-Za-z_$][\w$]*|\d+(?:\.\d+)?|=>|\.\.\.|\?\.|===|!==|==|!=|&&|\|\||[^\s]", re.ASCII
+    )
+    regex_prefixes = {
+        "=",
+        "(",
+        "[",
+        "{",
+        ",",
+        ":",
+        ";",
+        "!",
+        "?",
+        "return",
+        "=>",
+        "&&",
+        "||",
+        "throw",
+        "case",
+        "yield",
+        "typeof",
+        "void",
+        "delete",
+        "else",
+        "do",
+    }
+    while index < len(source):
+        char = source[index]
+        if char.isspace():
+            index += 1
+            continue
+        if source.startswith("//", index):
+            end = source.find("\n", index + 2)
+            index = len(source) if end < 0 else end + 1
+            continue
+        if source.startswith("/*", index):
+            end = source.find("*/", index + 2)
+            if end < 0:
+                return []
+            index = end + 2
+            continue
+        start = index
+        if char in {'"', "'", "`"}:
+            index += 1
+            while index < len(source):
+                if source[index] == "\\":
+                    index += 2
+                    continue
+                if char == "`" and source.startswith("${", index):
+                    return []
+                if source[index] == char:
+                    index += 1
+                    break
+                index += 1
+            else:
+                return []
+            tokens.append((source[start:index], start))
+            regex_after_control = False
+        elif char == "/" and (not tokens or tokens[-1][0] in regex_prefixes or regex_after_control):
+            index += 1
+            in_class = False
+            while index < len(source) and source[index] not in "\r\n":
+                if source[index] == "\\":
+                    index += 2
+                    continue
+                if source[index] == "[":
+                    in_class = True
+                elif source[index] == "]":
+                    in_class = False
+                elif source[index] == "/" and not in_class:
+                    index += 1
+                    break
+                index += 1
+            else:
+                return []
+            while index < len(source) and source[index].isalpha():
+                index += 1
+            tokens.append((source[start:index], start))
+            regex_after_control = False
+        elif char == "/" and tokens and tokens[-1][0] == "}":
+            # Object-division versus a new statement regex needs a full parser.
+            # Do not interpret regex text as constructors or JSON dereferences.
+            return []
+        else:
+            match = token_pattern.match(source, index)
+            if match is None:
+                return []
+            value = match.group()
+            regex_after_control = False
+            if value == "(":
+                paren_context.append(tokens[-1][0] if tokens else "")
+            elif value == ")" and paren_context:
+                regex_after_control = paren_context.pop() in {
+                    "if",
+                    "while",
+                    "for",
+                    "with",
+                    "switch",
+                    "catch",
+                }
+            tokens.append((value, start))
+            index = match.end()
+        if len(tokens) > 50_000:
+            return []
+    return tokens
+
+
+def js_context_structure(values: Sequence[str]) -> tuple[dict[int, int], list[int]]:
+    pairs: dict[int, int] = {}
+    stack: list[int] = []
+    depths: list[int] = []
+    for index, value in enumerate(values):
+        depths.append(len(stack))
+        if value in {"(", "{", "["}:
+            stack.append(index)
+        elif value in {")", "}", "]"}:
+            if not stack or {"(": ")", "{": "}", "[": "]"}[values[stack[-1]]] != value:
+                return {}, []
+            opening = stack.pop()
+            pairs[opening] = index
+    return ({}, []) if stack else (pairs, depths)
+
+
+def js_shadowed_bindings(
+    values: Sequence[str], pairs: dict[int, int], bindings: dict[str, int]
+) -> set[str]:
+    """Collect rebinding/parameter evidence once, not once per imported name."""
+    shadowed: set[str] = set()
+    parameter_ranges = [0] * (len(values) + 1)
+    for opening, closing in pairs.items():
+        if (
+            values[opening] == "("
+            and closing + 1 < len(values)
+            and values[closing + 1] in {"{", "=>"}
+        ):
+            parameter_ranges[opening + 1] += 1
+            parameter_ranges[closing] -= 1
+    for index, value in enumerate(values):
+        if value != "import":
+            continue
+        end = index + 1
+        while end < len(values) and end - index < 256 and values[end] not in {"from", ";"}:
+            end += 1
+        for cursor in range(index + 1, end):
+            name = values[cursor]
+            if name in bindings and not index < bindings[name] < end:
+                shadowed.add(name)
+    in_parameters = 0
+    for index, value in enumerate(values):
+        in_parameters += parameter_ranges[index]
+        if value not in bindings:
+            continue
+        if in_parameters or (
+            index != bindings[value]
+            and (
+                (index and values[index - 1] in {"const", "let", "var", "class", "function", "as"})
+                or (index + 1 < len(values) and values[index + 1] in {"=", "=>"})
+            )
+        ):
+            shadowed.add(value)
+    return shadowed
+
+
+def js_precision_lines(
+    path: Path, source: str, frameworks: frozenset[str] | None
+) -> list[tuple[str, int]]:
+    """Require local identity, scope, and source evidence for three narrow checks."""
+    tokens = js_context_tokens(source)
+    values = [token[0] for token in tokens]
+    pairs, depths = js_context_structure(values)
+    if not depths:
+        return []
+    hits: list[tuple[str, int]] = []
+
+    # Only literal top-level BullMQ imports/require bindings establish identity.
+    bindings: dict[str, tuple[str, int]] = {}
+    for index, value in enumerate(values):
+        if depths[index] != 0:
+            continue
+        if value == "import" and values[index + 1 : index + 2] != ["type"]:
+            if values[index + 1 : index + 3] == ["*", "as"] and values[index + 4 : index + 6] in (
+                ["from", "'bullmq'"],
+                ["from", '"bullmq"'],
+            ):
+                bindings[values[index + 3]] = ("namespace", index + 3)
+            opening = index + 1
+            closing = pairs.get(opening)
+            if (
+                closing is not None
+                and values[opening] == "{"
+                and values[closing + 1 : closing + 3]
+                in (["from", "'bullmq'"], ["from", '"bullmq"'])
+            ):
+                for cursor in range(opening + 1, closing):
+                    if values[cursor] == "Worker" and values[cursor - 1] in {"{", ","}:
+                        binding = cursor + 2 if values[cursor + 1] == "as" else cursor
+                        bindings[values[binding]] = ("named", binding)
+        if value == "const" and values[index + 1 : index + 2] == ["{"]:
+            closing = pairs.get(index + 1)
+            if (
+                closing is not None
+                and values[closing + 1 : closing + 4] == ["=", "require", "("]
+                and values[closing + 4 : closing + 6] in (["'bullmq'", ")"], ['"bullmq"', ")"])
+            ):
+                for cursor in range(index + 2, closing):
+                    if values[cursor] == "Worker" and values[cursor - 1] in {"{", ","}:
+                        binding = cursor + 2 if values[cursor + 1] == ":" else cursor
+                        bindings[values[binding]] = ("named", binding)
+    binding_positions = {name: binding for name, (_, binding) in bindings.items()}
+    binding_positions.setdefault("fetch", -1)
+    shadowed = js_shadowed_bindings(values, pairs, binding_positions)
+    for index, value in enumerate(values[:-1]):
+        name = values[index + 1]
+        if value != "new" or name not in bindings or name in shadowed:
+            continue
+        kind, _ = bindings[name]
+        constructor = ["new", name] + ([".", "Worker"] if kind == "namespace" else [])
+        if values[index : index + len(constructor)] != constructor:
+            continue
+        opening = index + len(constructor)
+        closing = pairs.get(opening)
+        if closing is None or values[opening] != "(" or closing - opening > 512:
+            continue
+        commas = [
+            i
+            for i in range(opening + 1, closing)
+            if values[i] == "," and depths[i] == depths[opening] + 1
+        ]
+        if len(commas) != 2:
+            continue
+        options = commas[-1] + 1
+        if values[options] != "{" or pairs.get(options) != closing - 1:
+            continue
+        option_depth = depths[options] + 1
+        segments: list[list[str]] = [[]]
+        for cursor in range(options + 1, closing - 1):
+            if values[cursor] == "," and depths[cursor] == option_depth:
+                segments.append([])
+            else:
+                segments[-1].append(values[cursor])
+        if any(segment and segment[0] in {"...", "["} for segment in segments):
+            continue
+        configured = [
+            segment[1:]
+            for segment in segments
+            if segment and segment[0].strip("\"'") == "skipStalledCheck"
+        ]
+        if configured and configured[-1] == [":", "true"]:
+            hits.append(("SP583", source.count("\n", 0, tokens[index][1]) + 1))
+
+    # A client directive can follow another directive (for example use strict),
+    # but not an import or an ordinary executable statement.
+    directives: set[str] = set()
+    cursor = 0
+    while cursor < len(values) and values[cursor].startswith(("'", '"')):
+        next_cursor = cursor + 1
+        if next_cursor < len(values) and values[next_cursor] != ";":
+            gap = source[tokens[cursor][1] + len(values[cursor]) : tokens[next_cursor][1]]
+            if "\n" not in gap or values[next_cursor] in {
+                "(",
+                "[",
+                ".",
+                "?.",
+                "+",
+                "-",
+                "*",
+                "/",
+                "?",
+                "&&",
+                "||",
+            }:
+                break
+        directives.add(values[cursor])
+        cursor = next_cursor + (values[next_cursor : next_cursor + 1] == [";"])
+
+    # Adjacent default-GET literal requests in one exported async Page/Layout.
+    if (
+        path.name.lower()
+        in {
+            "page.tsx",
+            "page.jsx",
+            "page.ts",
+            "page.js",
+            "layout.tsx",
+            "layout.jsx",
+            "layout.ts",
+            "layout.js",
+        }
+        and (frameworks is None or "nextjs" in frameworks)
+        and not directives.intersection({'"use client"', "'use client'"})
+        and "fetch" not in bindings
+        and "fetch" not in shadowed
+    ):
+        for index in range(len(values) - 5):
+            if depths[index] != 0 or values[index : index + 4] != [
+                "export",
+                "default",
+                "async",
+                "function",
+            ]:
+                continue
+            opening = index + 4 if values[index + 4] == "(" else index + 5
+            params_end = pairs.get(opening)
+            body = params_end + 1 if params_end is not None else -1
+            if body not in pairs or values[body] != "{":
+                continue
+            previous: tuple[int, str, int] | None = None
+            for cursor in range(body + 1, pairs[body]):
+                if depths[cursor] != depths[body] + 1 or values[cursor] != "const":
+                    continue
+                chunk = values[cursor : cursor + 8]
+                if (
+                    len(chunk) != 8
+                    or chunk[2:6] != ["=", "await", "fetch", "("]
+                    or chunk[7] != ")"
+                    or not re.fullmatch(r"""["']https?://[^"'\\]+["']""", chunk[6])
+                ):
+                    previous = None
+                    continue
+                end = cursor + 8
+                if values[end : end + 1] == [";"]:
+                    end += 1
+                url = chunk[6][1:-1]
+                if previous is not None and previous[2] == cursor and previous[1] != url:
+                    hits.append(("SP597", source.count("\n", 0, tokens[previous[0]][1]) + 1))
+                    break
+                previous = (cursor, url, end)
+
+    # A JSON parse followed immediately by an unchecked field dereference.
+    # Non-null assertions alone have no runtime operation; names alone are not sources.
+    if path.suffix.lower() in {".ts", ".tsx"}:
+        for index in range(len(values) - 9):
+            if (
+                values[index] not in {"const", "let"}
+                or values[index + 2 : index + 4] != ["=", "await"]
+                or values[index + 5 : index + 9] != [".", "json", "(", ")"]
+            ):
+                continue
+            name = values[index + 1]
+            cursor = index + 9
+            if values[cursor : cursor + 1] == [";"]:
+                cursor += 1
+            if values[cursor : cursor + 1] == ["return"]:
+                use = cursor + 1
+            elif values[cursor : cursor + 1] == ["const"] and values[cursor + 2 : cursor + 3] == [
+                "="
+            ]:
+                use = cursor + 3
+            else:
+                continue
+            if (
+                use + 4 < len(values)
+                and depths[cursor] == depths[index]
+                and values[use : use + 2] == [name, "."]
+                and re.fullmatch(r"[A-Za-z_$][\w$]*", values[use + 2])
+                and values[use + 3] == "!"
+                and values[use + 4] in {".", "[", "("}
+            ):
+                hits.append(("SP599", source.count("\n", 0, tokens[use][1]) + 1))
+    return list(dict.fromkeys(hits))
+
+
 def find_regex_issues(
     path: Path,
     relative_path: str,
@@ -13570,21 +14521,39 @@ def find_regex_issues(
     lines: Sequence[str] | None = None,
     python_string_lines: frozenset[int] | None = None,
     detected_frameworks: frozenset[str] | None = None,
+    skill_context: bool | None = None,
+    docstring_lines: frozenset[int] | None = None,
 ) -> list[Finding]:
-    findings: list[Finding] = []
+    findings: list[Finding] = BoundedFindings()
     suffix = path.suffix.lower()
     file_kind = scanner_file_kind(path)
     normalized_relative_path = relative_path.replace("\\", "/").lower().removeprefix("./")
     is_github_workflow = normalized_relative_path.startswith(".github/workflows/") or (
         "/.github/workflows/" in f"/{normalized_relative_path}"
     )
-    lines = source_text.splitlines() if lines is None else lines
+    source_lines = source_text.splitlines()
+    if any(len(line) > MAX_SCAN_LINE_CHARS for line in source_lines):
+        raise ScanCoverageError("line_limit")
+    lines = source_lines if lines is None else lines
+    # Keep this public helper safe for direct callers too. File/snippet scans
+    # already enforce the line budget, but rule-contract builders and tests can
+    # invoke the regex engine directly with attacker-controlled text.
+    if any(len(line) > MAX_SCAN_LINE_CHARS for line in lines):
+        raise ScanCoverageError("line_limit")
+    if is_github_workflow and suffix in {".yml", ".yaml"}:
+        for line_number in github_run_expression_lines(source_text):
+            append_file_level_finding(findings, "SP210", relative_path, lines, line_number)
+    if suffix in {".js", ".jsx", ".ts", ".tsx"} and any(
+        marker in source_text for marker in ("bullmq", "fetch", ".json")
+    ):
+        for rule_id, line_number in js_precision_lines(path, source_text, detected_frameworks):
+            append_file_level_finding(findings, rule_id, relative_path, lines, line_number)
     package_dependency_names: set[str] = set()
     package_lifecycle_names: set[str] = set()
     if path.name.lower() == "package.json":
         try:
             package_payload = json.loads(source_text)
-        except (json.JSONDecodeError, TypeError):
+        except (json.JSONDecodeError, TypeError, RecursionError, MemoryError):
             package_payload = None
         if isinstance(package_payload, dict):
             for section_name in (
@@ -13629,10 +14598,16 @@ def find_regex_issues(
         path.name.lower() in {"dockerfile", "containerfile"},
     )
     mcp_context = has_mcp_context(relative_path, source_text)
+    effective_skill_context = (
+        has_skill_path_context(relative_path) if skill_context is None else skill_context
+    )
+    docstring_lines = docstring_lines or frozenset()
     gates = rule_gates()
     for rule in applicable_rules:
         rule_is_secret = rule.redact
         rule_id = rule.rule_id
+        if rule_id in SKILL_RULE_IDS and not effective_skill_context:
+            continue
         if rule_id in MCP_RULE_IDS and not mcp_context:
             continue
         if rule_id in {"SP092", "SP095"} and path.name.lower() != "package.json":
@@ -13710,7 +14685,9 @@ def find_regex_issues(
                 index = line_number - 1
                 if index >= len(lines):
                     continue
-                if not rule_is_secret and comment_flags[index]:
+                if not rule_is_secret and (comment_flags[index] or line_number in docstring_lines):
+                    continue
+                if rule_id == "SP019" and line_number in docstring_lines:
                     continue
                 if rule_id in ignore_rule_ids[index]:
                     continue
@@ -13745,7 +14722,9 @@ def find_regex_issues(
                 )
             continue
         for index, line in enumerate(lines):
-            if not rule_is_secret and comment_flags[index]:
+            if not rule_is_secret and (comment_flags[index] or (index + 1) in docstring_lines):
+                continue
+            if rule_id == "SP019" and (index + 1) in docstring_lines:
                 continue
             if rule_id in ignore_rule_ids[index]:
                 continue
@@ -13864,18 +14843,6 @@ def find_regex_issues(
         )
         if hook_line:
             append_file_level_finding(findings, "SP596", relative_path, lines, hook_line)
-
-    if (
-        suffix in {".tsx", ".jsx", ".ts", ".js"}
-        and len(re.findall(r"\bawait\s+fetch\s*\(", source_text)) >= 2
-        and "Promise.all" not in source_text
-    ):
-        fetch_line = next(
-            (i for i, v in enumerate(lines, 1) if re.search(r"\bawait\s+fetch\s*\(", v)),
-            None,
-        )
-        if fetch_line:
-            append_file_level_finding(findings, "SP597", relative_path, lines, fetch_line)
 
     if (
         suffix in {".ts", ".js"}
@@ -14127,25 +15094,21 @@ def find_regex_issues(
 
     if (
         suffix in {".ts", ".tsx", ".js", ".jsx", ".mjs"}
-        and ("runtime" in source_text and "edge" in source_text)
-        and re.search(
-            r"""import\s+.*?from\s+["'](?:node:)?(?:fs|child_process|cluster|dgram|v8)["']""",
-            source_text,
-        )
+        and "runtime" in source_text
+        and "edge" in source_text
     ):
-        edge_line = next(
-            (
-                i
-                for i, v in enumerate(lines, 1)
-                if re.search(
-                    r"""import\s+.*?from\s+["'](?:node:)?(?:fs|child_process|cluster|dgram|v8)["']""",
-                    v,
-                )
-            ),
-            None,
-        )
-        if edge_line:
-            append_file_level_finding(findings, "SP631", relative_path, lines, edge_line)
+        declaration_lines = js_static_declaration_lines(lines)
+        if any(EDGE_RUNTIME_DECLARATION.fullmatch(lines[index]) for index in declaration_lines):
+            edge_line = next(
+                (
+                    index + 1
+                    for index in declaration_lines
+                    if EDGE_NATIVE_IMPORT.match(lines[index])
+                ),
+                None,
+            )
+            if edge_line:
+                append_file_level_finding(findings, "SP631", relative_path, lines, edge_line)
 
     # Framework-specific: FastAPI routes without visible rate limiting
     if (
@@ -14412,6 +15375,59 @@ def find_rule(rule_id: str) -> Rule:
     return rule
 
 
+EDGE_RUNTIME_DECLARATION = re.compile(
+    r"""[ \t]*export[ \t]+const[ \t]+runtime[ \t]*=[ \t]*(["'])edge\1[ \t]*;?[ \t]*(?://[^\r\n]*)?"""
+)
+EDGE_NATIVE_IMPORT = re.compile(
+    r"""^[ \t]*import[ \t]+(?!type\b)[^;\r\n]*?\bfrom[ \t]+["'](?:node:)?(?:fs|child_process|cluster|dgram|v8)["']"""
+)
+
+
+def js_static_declaration_lines(lines: Sequence[str]) -> list[int]:
+    """Conservative module-level candidates, excluding comments and quoted data.
+
+    This is not a JS parser. Stop at ambiguous JSX or template interpolation;
+    do not manufacture declaration evidence from unhandled syntax.
+    """
+    candidates: list[int] = []
+    quote: str | None = None
+    block_comment = False
+    depth = 0
+    for line_index, line in enumerate(lines):
+        if quote is None and not block_comment and depth == 0:
+            candidates.append(line_index)
+        index = 0
+        while index < len(line):
+            char = line[index]
+            pair = line[index : index + 2]
+            if block_comment:
+                if pair == "*/":
+                    block_comment = False
+                    index += 1
+            elif quote is not None:
+                if char == "\\":
+                    index += 1
+                elif char == quote:
+                    quote = None
+                elif quote == "`" and pair == "${":
+                    return candidates
+            elif pair == "//":
+                break
+            elif pair == "/*":
+                block_comment = True
+                index += 1
+            elif char in {"'", '"', "`"}:
+                quote = char
+            elif char == "<" and depth == 0:
+                return candidates
+            elif char in "({[":
+                depth += 1
+            elif char in ")}]":
+                depth = max(0, depth - 1)
+            index += 1
+    return candidates
+
+
 def _match_inside_string_literal(line: str, column: int) -> bool:
     """True when ``column`` lies inside an unclosed quoted literal of ``line``.
 
@@ -14648,7 +15664,7 @@ class PythonSecurityVisitor(ast.NodeVisitor):
         self.source_lines = source_lines
         self.authorized_routers = authorized_routers or set()
         self.ignore_ids = ignore_ids or ()
-        self.findings: list[Finding] = []
+        self.findings: list[Finding] = BoundedFindings()
         self.async_function_depth = 0
         self.loop_depth = 0
         self.transaction_depth = 0
@@ -14971,9 +15987,10 @@ class PythonSecurityVisitor(ast.NodeVisitor):
                 self.add_finding(find_rule("SP101"), node, detection="ast")
         if self.loop_depth > 0:
             receiver = name.split(".", 1)[0].lower() if "." in name else ""
-            if method in {"query", "execute", "filter", "filter_by", "find_one", "fetch_one"} or (
-                receiver in {"db", "session", "cursor", "repo", "conn", "orm"}
-                and method in {"get", "find", "select"}
+            db_methods = {"query", "execute", "filter_by", "find_one", "fetch_one"}
+            db_receivers = {"db", "session", "cursor", "repo", "conn", "orm"}
+            if method in db_methods or (
+                receiver in db_receivers and method in {"get", "find", "select", "filter"}
             ):
                 self.add_finding(find_rule("SP307"), node)
 
@@ -15057,7 +16074,10 @@ class PythonSecurityVisitor(ast.NodeVisitor):
                     break
                 if isinstance(child, ast.Call):
                     call_name = resolve_dotted_name(child.func).lower()
-                    if "sleep" in call_name or "wait" in call_name:
+                    if any(
+                        token in call_name
+                        for token in ("sleep", "wait", "select", "recv", "poll", "backoff")
+                    ):
                         has_backoff = True
                         break
             if not has_backoff:
@@ -15077,11 +16097,13 @@ class PythonSecurityVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
-def parse_python_source(source_text: str) -> ast.Module | None:
-    """Parse Python source, treating pathological input as unparseable, not fatal."""
+def parse_python_source(source_text: str, *, strict: bool = False) -> ast.Module | None:
+    """Parse Python source, treating parser failures as unavailable evidence in strict mode."""
     try:
         return ast.parse(source_text)
-    except (SyntaxError, ValueError, RecursionError, MemoryError):
+    except (SyntaxError, ValueError, RecursionError, MemoryError) as exc:
+        if strict:
+            raise ScanCoverageError("parser_limit") from exc
         return None
 
 
@@ -15204,24 +16226,52 @@ def find_python_ast_issues(
         tree = parse_python_source(source_text)
         if tree is None:
             return []
-    authorized_routers = find_authorized_routers(tree)
-    visitor = PythonSecurityVisitor(
-        relative_path,
-        source_lines=lines if lines is not None else source_text.splitlines(),
-        authorized_routers=authorized_routers,
-        ignore_ids=ignore_ids,
-    )
-    visitor.visit(tree)
+    try:
+        authorized_routers = find_authorized_routers(tree)
+        visitor = PythonSecurityVisitor(
+            relative_path,
+            source_lines=lines if lines is not None else source_text.splitlines(),
+            authorized_routers=authorized_routers,
+            ignore_ids=ignore_ids,
+        )
+        visitor.visit(tree)
+    except (RecursionError, MemoryError) as exc:
+        # A pathological AST is unavailable evidence, never a clean scan and
+        # never a process crash. The worker transports this typed omission.
+        raise ScanCoverageError("parser_limit") from exc
     return visitor.findings
 
 
 def lint_source_snippet(source_text: str, filename: str = "snippet.py") -> list[Finding]:
     """Lint an in-memory code snippet without reading from disk."""
+    if any(len(line) > MAX_SCAN_LINE_CHARS for line in source_text.splitlines()):
+        raise ScanCoverageError("line_limit")
     path = Path(filename)
     lines = source_text.splitlines()
-    python_tree = parse_python_source(source_text) if path.suffix.lower() == ".py" else None
+    # Snippet linting is consumed as validation evidence by the CLI/MCP. A
+    # parser failure must therefore be visible as unavailable evidence rather
+    # than silently dropping every AST-layer rule from an otherwise clean
+    # result. Repository scans use the same strict path in scan_single_file.
+    # Preserve the historical convenience of linting a deliberately truncated
+    # snippet such as ``def f():\n``: this is an incomplete editor buffer, not
+    # parser-version skew. Every other syntax/parser failure remains invalid
+    # evidence (exit 2), including malformed code that merely contains a
+    # security-sensitive token.
+    python_tree = None
+    if path.suffix.lower() == ".py":
+        try:
+            python_tree = parse_python_source(source_text, strict=True)
+        except ScanCoverageError as exc:
+            cause = exc.__cause__
+            if not (isinstance(cause, IndentationError) and source_text.rstrip().endswith(":")):
+                raise
     python_string_lines = multiline_string_lines(python_tree) if python_tree is not None else None
-    findings = find_regex_issues(path, filename, source_text, lines, python_string_lines)
+    doc_lines = (
+        precision_policy.docstring_lines(python_tree) if python_tree is not None else frozenset()
+    )
+    findings = find_regex_issues(
+        path, filename, source_text, lines, python_string_lines, docstring_lines=doc_lines
+    )
     if python_tree is not None:
         prefixes = comment_line_prefixes(path)
         ignore_ids = [extract_inline_ignore_ids(line, prefixes) for line in lines]
@@ -15229,23 +16279,165 @@ def lint_source_snippet(source_text: str, filename: str = "snippet.py") -> list[
             find_python_ast_issues(filename, source_text, lines, python_tree, ignore_ids)
         )
     active, _ = deduplicate_and_suppress_findings(findings)
-    return active
+    return precision_policy.apply_file_precision(
+        active,
+        relative_path=filename,
+        source_text=source_text,
+        secret_rule_ids=SECRET_RULE_IDS,
+        source_path=filename,
+    )
 
 
-def load_baseline_fingerprints(path: Path | None) -> set[str]:
+@dataclass(frozen=True)
+class SuppressionRule:
+    """Human-authored glob suppression; the reason field is mandatory."""
+
+    rule_id: str = ""
+    path: str = ""
+    evidence: str = ""
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class SuppressionBaseline:
+    """Version-2 baseline: exact fingerprints plus auditable glob rules."""
+
+    fingerprints: dict[str, str]
+    rules: tuple[SuppressionRule, ...] = ()
+    scanner_version: str | None = None
+
+
+_BASELINE_MATCHER_LIMIT = 512
+MAX_BASELINE_BYTES = 2_000_000
+MAX_BASELINE_FINGERPRINTS = 10_000
+MAX_BASELINE_RULES = 256
+
+
+def _baseline_matcher(value: object, label: str) -> str:
+    if not isinstance(value, str) or not value or len(value) > _BASELINE_MATCHER_LIMIT:
+        raise ValueError(f"baseline {label} must be a non-empty string of at most 512 characters")
+    if not value.isprintable():
+        raise ValueError(f"baseline {label} must not contain control characters")
+    return value
+
+
+def _baseline_reason(value: object) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("every baseline rule or fingerprint needs a non-empty reason")
+    return _baseline_matcher(value, "reason")
+
+
+def _baseline_object_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    payload: dict[str, object] = {}
+    for key, value in pairs:
+        if key in payload:
+            raise ValueError("baseline contains duplicate JSON keys")
+        payload[key] = value
+    return payload
+
+
+def _baseline_keys(payload: dict[str, object], allowed: set[str]) -> None:
+    if set(payload) - allowed:
+        raise ValueError("baseline contains unknown fields; check the suppression scope")
+
+
+def _path_inside_root(root: Path, candidate: Path | None) -> str | None:
+    """Repository-relative path of candidate when it lives inside root."""
+    if candidate is None:
+        return None
+    try:
+        return candidate.resolve().relative_to(root).as_posix()
+    except (ValueError, OSError):
+        return None
+
+
+def load_baseline_fingerprints(path: Path | None) -> SuppressionBaseline:
+    """Load a version-1 (string array) or version-2 baseline; invalid input raises."""
     if path is None:
-        return set()
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    values = payload.get("fingerprints", [])
-    if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
-        raise ValueError("baseline must contain a string array named 'fingerprints'")
-    return set(values)
+        return SuppressionBaseline(fingerprints={})
+    try:
+        source = read_scannable_bytes(path, MAX_BASELINE_BYTES).decode("utf-8")
+    except ScanCoverageError as exc:
+        raise ValueError("baseline is unreadable or exceeds the input byte limit") from exc
+    try:
+        payload = json.loads(source, object_pairs_hook=_baseline_object_pairs)
+    except (RecursionError, MemoryError) as exc:
+        raise ValueError("baseline JSON exceeds parser/resource limits") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("baseline must contain a JSON object")
+    _baseline_keys(payload, {"version", "scanner_version", "fingerprints", "rules"})
+    version = payload.get("version", 1)
+    if type(version) is not int or version not in (1, 2):
+        raise ValueError("unsupported baseline version; expected integer 1 or 2")
+    if version == 1 and ("rules" in payload or "fingerprints" not in payload):
+        raise ValueError("version-1 baseline requires fingerprints and cannot contain glob rules")
+    scanner_version = payload.get("scanner_version")
+    if scanner_version is not None:
+        _baseline_matcher(scanner_version, "scanner_version")
+    raw_fingerprints = payload.get("fingerprints", [])
+    if not isinstance(raw_fingerprints, list):
+        raise ValueError("baseline must contain an array named 'fingerprints'")
+    if len(raw_fingerprints) > MAX_BASELINE_FINGERPRINTS:
+        raise ValueError("baseline fingerprint count exceeds the limit of 10000")
+    fingerprints: dict[str, str] = {}
+    for entry in raw_fingerprints:
+        if isinstance(entry, str):
+            _baseline_matcher(entry, "fingerprint")
+            fingerprints[entry] = ""
+            continue
+        if isinstance(entry, dict):
+            if version != 2:
+                raise ValueError("version-1 baseline fingerprints must be strings")
+            _baseline_keys(entry, {"hash", "reason", "rule_id", "path"})
+            raw_hash = entry.get("hash")
+            if not isinstance(raw_hash, str) or not raw_hash:
+                raise ValueError("baseline fingerprint objects need a non-empty 'hash'")
+            _baseline_matcher(raw_hash, "fingerprint")
+            reason = _baseline_reason(entry.get("reason"))
+            for label in ("rule_id", "path"):
+                if label in entry:
+                    _baseline_matcher(entry[label], label)
+            fingerprints[raw_hash] = reason
+            continue
+        raise ValueError("baseline fingerprints must be strings or objects with a 'hash'")
+    raw_rules = payload.get("rules", [])
+    if not isinstance(raw_rules, list):
+        raise ValueError("baseline must contain an array named 'rules'")
+    if len(raw_rules) > MAX_BASELINE_RULES:
+        raise ValueError("baseline rule count exceeds the limit of 256")
+    rules: list[SuppressionRule] = []
+    for entry in raw_rules:
+        if not isinstance(entry, dict):
+            raise ValueError("baseline rules must be objects")
+        _baseline_keys(entry, {"id", "path", "evidence", "reason"})
+        reason = _baseline_reason(entry.get("reason"))
+        rule_id = _baseline_matcher(entry["id"], "rule id") if "id" in entry else ""
+        rule_path = _baseline_matcher(entry["path"], "rule path") if "path" in entry else ""
+        rule_evidence = (
+            _baseline_matcher(entry["evidence"], "rule evidence") if "evidence" in entry else ""
+        )
+        if not (rule_id or rule_path or rule_evidence):
+            raise ValueError("baseline rules need at least one matcher: id, path, or evidence")
+        rules.append(
+            SuppressionRule(rule_id=rule_id, path=rule_path, evidence=rule_evidence, reason=reason)
+        )
+    return SuppressionBaseline(
+        fingerprints=fingerprints, rules=tuple(rules), scanner_version=scanner_version
+    )
+
+
+def _rule_suppresses(rule: SuppressionRule, finding: Finding) -> bool:
+    if rule.rule_id and not fnmatch.fnmatchcase(finding.rule_id, rule.rule_id):
+        return False
+    if rule.path and not fnmatch.fnmatchcase(finding.path, rule.path):
+        return False
+    return not (rule.evidence and not fnmatch.fnmatchcase(finding.evidence, rule.evidence))
 
 
 def deduplicate_and_suppress_findings(
     findings: Iterable[Finding],
-    baseline: set[str] | None = None,
-) -> tuple[list[Finding], int]:
+    baseline: SuppressionBaseline | set[str] | None = None,
+) -> tuple[list[Finding], list[tuple[Finding, str]]]:
     unique: dict[tuple[str, str, int], Finding] = {}
     for finding in findings:
         key = (finding.rule_id, finding.path, finding.line)
@@ -15257,13 +16449,22 @@ def deduplicate_and_suppress_findings(
             # pattern hit never shadows richer AST/taint evidence.
             unique[key] = finding
     active: list[Finding] = []
-    suppressed_count = 0
-    baseline_set = baseline or set()
+    suppressed: list[tuple[Finding, str]] = []
+    if isinstance(baseline, SuppressionBaseline):
+        fingerprint_reasons = baseline.fingerprints
+        rules = baseline.rules
+    else:
+        fingerprint_reasons = {value: "" for value in (baseline or set())}
+        rules = ()
     for finding in unique.values():
-        if finding.fingerprint in baseline_set:
-            suppressed_count += 1
+        if finding.fingerprint in fingerprint_reasons:
+            suppressed.append((finding, fingerprint_reasons[finding.fingerprint]))
         else:
-            active.append(finding)
+            matched = next((rule for rule in rules if _rule_suppresses(rule, finding)), None)
+            if matched is not None:
+                suppressed.append((finding, matched.reason))
+            else:
+                active.append(finding)
     active.sort(
         key=lambda item: (
             SEVERITY[item.severity],
@@ -15272,7 +16473,7 @@ def deduplicate_and_suppress_findings(
             item.line,
         )
     )
-    return active, suppressed_count
+    return active, suppressed
 
 
 MANIFEST_FILE_NAMES = (
@@ -15300,7 +16501,7 @@ def repository_manifest_present(root: Path) -> bool:
     return bool(list(root.glob("*.csproj")) or list(root.glob("*.sln")))
 
 
-def detect_frameworks(root: Path) -> set[str]:
+def detect_frameworks(root: Path, max_file_bytes: int = 1_000_000) -> set[str]:
     """Detect frameworks and runtimes from manifest files in the repository root."""
     frameworks: set[str] = set()
 
@@ -15308,7 +16509,9 @@ def detect_frameworks(root: Path) -> set[str]:
     pkg_path = root / "package.json"
     if pkg_path.is_file():
         try:
-            pkg = json.loads(pkg_path.read_text(encoding="utf-8", errors="replace"))
+            pkg = json.loads(read_scannable_bytes(pkg_path, max_file_bytes).decode("utf-8"))
+            if not isinstance(pkg, dict):
+                raise ValueError("package manifest must contain an object")
             all_deps: dict[str, str] = {}
             for key in ("dependencies", "devDependencies", "peerDependencies"):
                 val = pkg.get(key)
@@ -15357,7 +16560,7 @@ def detect_frameworks(root: Path) -> set[str]:
                 frameworks.add("mongoose")
             if "@supabase/supabase-js" in all_deps:
                 frameworks.add("supabase")
-        except (OSError, json.JSONDecodeError):
+        except (OSError, ValueError, RecursionError, MemoryError):
             pass
 
     # 2. Python (pyproject.toml, requirements.txt, setup.py, Pipfile, poetry.lock)
@@ -15365,7 +16568,7 @@ def detect_frameworks(root: Path) -> set[str]:
         manifest_path = root / manifest
         if manifest_path.is_file():
             try:
-                text = manifest_path.read_text(encoding="utf-8", errors="replace").lower()
+                text = read_scannable_bytes(manifest_path, max_file_bytes).decode("utf-8").lower()
                 if "django" in text:
                     frameworks.add("django")
                 if "fastapi" in text:
@@ -15384,14 +16587,14 @@ def detect_frameworks(root: Path) -> set[str]:
                     frameworks.add("sqlalchemy")
                 if "supabase" in text:
                     frameworks.add("supabase")
-            except OSError:
+            except (OSError, ValueError):
                 pass
 
     # 3. Go (go.mod)
     go_mod = root / "go.mod"
     if go_mod.is_file():
         try:
-            text = go_mod.read_text(encoding="utf-8", errors="replace").lower()
+            text = read_scannable_bytes(go_mod, max_file_bytes).decode("utf-8").lower()
             if "gin-gonic/gin" in text:
                 frameworks.add("gin")
             if "labstack/echo" in text:
@@ -15400,45 +16603,45 @@ def detect_frameworks(root: Path) -> set[str]:
                 frameworks.add("fiber")
             if "go-chi/chi" in text:
                 frameworks.add("chi")
-        except OSError:
+        except (OSError, ValueError):
             pass
 
     # 4. Rust (Cargo.toml)
     cargo_toml = root / "Cargo.toml"
     if cargo_toml.is_file():
         try:
-            text = cargo_toml.read_text(encoding="utf-8", errors="replace").lower()
+            text = read_scannable_bytes(cargo_toml, max_file_bytes).decode("utf-8").lower()
             if "actix-web" in text:
                 frameworks.add("actix")
             if "axum" in text:
                 frameworks.add("axum")
             if "rocket" in text:
                 frameworks.add("rocket")
-        except OSError:
+        except (OSError, ValueError):
             pass
 
     # 5. PHP (composer.json)
     composer_json = root / "composer.json"
     if composer_json.is_file():
         try:
-            text = composer_json.read_text(encoding="utf-8", errors="replace").lower()
+            text = read_scannable_bytes(composer_json, max_file_bytes).decode("utf-8").lower()
             if "laravel" in text:
                 frameworks.add("laravel")
             if "symfony" in text:
                 frameworks.add("symfony")
-        except OSError:
+        except (OSError, ValueError):
             pass
 
     # 6. Ruby (Gemfile)
     gemfile = root / "Gemfile"
     if gemfile.is_file():
         try:
-            text = gemfile.read_text(encoding="utf-8", errors="replace").lower()
+            text = read_scannable_bytes(gemfile, max_file_bytes).decode("utf-8").lower()
             if "rails" in text:
                 frameworks.add("rails")
             if "sinatra" in text:
                 frameworks.add("sinatra")
-        except OSError:
+        except (OSError, ValueError):
             pass
 
     # 7. Java / Kotlin / JVM (pom.xml, build.gradle, build.gradle.kts)
@@ -15446,14 +16649,14 @@ def detect_frameworks(root: Path) -> set[str]:
         jvm_path = root / jvm_file
         if jvm_path.is_file():
             try:
-                text = jvm_path.read_text(encoding="utf-8", errors="replace").lower()
+                text = read_scannable_bytes(jvm_path, max_file_bytes).decode("utf-8").lower()
                 if "spring-boot" in text or "springframework" in text:
                     frameworks.add("springboot")
                 if "quarkus" in text:
                     frameworks.add("quarkus")
                 if "micronaut" in text:
                     frameworks.add("micronaut")
-            except OSError:
+            except (OSError, ValueError):
                 pass
 
     # 8. C# / .NET (*.csproj, global.json, *.sln)
@@ -15465,12 +16668,12 @@ def detect_frameworks(root: Path) -> set[str]:
         ):
             frameworks.add("dotnet")
             for csproj in root.glob("*.csproj"):
-                text = csproj.read_text(encoding="utf-8", errors="replace").lower()
+                text = read_scannable_bytes(csproj, max_file_bytes).decode("utf-8").lower()
                 if "microsoft.aspnetcore" in text:
                     frameworks.add("aspnetcore")
                 if "microsoft.entityframeworkcore" in text:
                     frameworks.add("entityframework")
-    except OSError:
+    except (OSError, ValueError):
         pass
 
     # 9. C / C++ (CMakeLists.txt, Makefile)
@@ -15498,6 +16701,31 @@ def detect_frameworks(root: Path) -> set[str]:
 GIT_REF_PATTERN = re.compile(r"^[A-Za-z0-9._/@][A-Za-z0-9._/@~-]*$")
 
 
+def _trusted_git_binary(root: Path) -> Path:
+    """Resolve Git without accepting a repository-controlled PATH shadow."""
+    git_location = shutil.which("git")
+    if not git_location:
+        raise ValueError("git-history evidence is unavailable: git was not found")
+    lexical = Path(git_location)
+    if not lexical.is_absolute():
+        raise ValueError("git-history evidence refused a relative Git PATH entry")
+    repository_path = Path(os.path.abspath(os.fspath(root)))
+    repository_root = root.resolve()
+    # Check both lexical and canonical spellings. The lexical check catches a
+    # repo symlink directory pointing outside; the canonical check catches a
+    # host PATH symlink resolving back into the repository. Keeping both roots
+    # handles Windows long/8.3 spellings without following the candidate link.
+    canonical = lexical.resolve()
+    for candidate in (lexical, canonical):
+        for boundary in (repository_path, repository_root):
+            try:
+                candidate.relative_to(boundary)
+            except ValueError:
+                continue
+            raise ValueError("git-history evidence refused a Git executable inside the scan root")
+    return canonical
+
+
 def changed_files(root: Path, git_ref: str) -> frozenset[str]:
     """Resolve repository-relative paths changed relative to a git ref, failing closed."""
     if not GIT_REF_PATTERN.match(git_ref):
@@ -15505,9 +16733,6 @@ def changed_files(root: Path, git_ref: str) -> frozenset[str]:
     repository_root = root.resolve()
     commands = (
         [
-            "git",
-            "-C",
-            str(repository_root),
             "diff",
             "--name-only",
             "-z",
@@ -15520,9 +16745,6 @@ def changed_files(root: Path, git_ref: str) -> frozenset[str]:
             ".",
         ],
         [
-            "git",
-            "-C",
-            str(repository_root),
             "ls-files",
             "--others",
             "--exclude-standard",
@@ -15532,22 +16754,60 @@ def changed_files(root: Path, git_ref: str) -> frozenset[str]:
         ],
     )
     changed: set[str] = set()
+    try:
+        git_binary = _trusted_git_binary(repository_root)
+    except ValueError as exc:
+        message = str(exc).replace("git-history evidence", "changed-file evidence")
+        raise ValueError(message) from exc
+    environment = os.environ.copy()
+    for name in tuple(environment):
+        if name in {
+            "GIT_DIR",
+            "GIT_COMMON_DIR",
+            "GIT_WORK_TREE",
+            "GIT_INDEX_FILE",
+            "GIT_OBJECT_DIRECTORY",
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+            "GIT_CONFIG",
+            "GIT_CONFIG_GLOBAL",
+            "GIT_CONFIG_PARAMETERS",
+            "GIT_CONFIG_COUNT",
+        } or name.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_")):
+            environment.pop(name)
+    environment.update(
+        {
+            "GIT_PAGER": "cat",
+            "GIT_TERMINAL_PROMPT": "0",
+        }
+    )
     for command in commands:
-        completed = subprocess.run(  # noqa: S603 (git ref is validated against GIT_REF_PATTERN above)
-            command,
-            capture_output=True,
-            check=False,
-        )
+        try:
+            completed = subprocess.run(  # noqa: S603 (validated absolute git path and ref)
+                [
+                    str(git_binary),
+                    "--no-pager",
+                    "-c",
+                    "core.fsmonitor=false",
+                    "-C",
+                    str(repository_root),
+                    *command,
+                ],
+                capture_output=True,
+                check=False,
+                env=environment,
+                timeout=10,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise ValueError(f"cannot resolve changed files: {exc}") from exc
+        if len(completed.stdout) + len(completed.stderr) > 2_000_000:
+            raise ValueError("changed-file evidence exceeded the 2000000-byte output limit")
         if completed.returncode != 0:
-            error_text = (completed.stderr or completed.stdout or b"").decode("utf-8", "replace")
+            error_text = (completed.stderr or completed.stdout).decode("utf-8", "replace")
             details = error_text.strip().splitlines()
             hint = details[0] if details else "git failed"
             raise ValueError(f"cannot resolve git ref {git_ref!r}: {hint}")
-        changed.update(
-            raw_path.decode("utf-8", "surrogateescape")
-            for raw_path in completed.stdout.split(b"\0")
-            if raw_path
-        )
+        stdout = completed.stdout.decode("utf-8", "replace")
+        changed.update(raw_path for raw_path in stdout.split("\0") if raw_path)
     return frozenset(path.removeprefix("./") for path in changed)
 
 
@@ -15586,7 +16846,7 @@ def collect_cross_file_taint(
     )
     graph.build()
     flows = graph.propagate_interprocedural_taint()
-    findings: list[Finding] = []
+    findings: list[Finding] = BoundedFindings()
     unsanitized = 0
     for flow in sorted(
         flows,
@@ -15616,18 +16876,122 @@ def _worker_initializer() -> None:
         sys.path.insert(0, scripts_directory)
 
 
+class ScanCoverageError(ValueError):
+    """An expected content omission, distinct from a finding or analyzer crash."""
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
+def read_scannable_bytes(path: Path, limit: int, *, header_only: bool = False) -> bytes:
+    """Read a bounded regular file without following a final symlink.
+
+    The descriptor checks cover replacement between discovery and open. This is
+    not a filesystem snapshot; callers must scan a quiescent checkout.
+    """
+    try:
+        before = path.lstat()
+        if not stat_module.S_ISREG(before.st_mode) or is_link_or_reparse(before):
+            raise ScanCoverageError("unreadable")
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        flags |= getattr(os, "O_NONBLOCK", 0)
+        descriptor = os.open(path, flags)
+        try:
+            opened = os.fstat(descriptor)
+            if not stat_module.S_ISREG(opened.st_mode) or (before.st_dev, before.st_ino) != (
+                opened.st_dev,
+                opened.st_ino,
+            ):
+                raise ScanCoverageError("unreadable")
+            with os.fdopen(descriptor, "rb", closefd=False) as stream:
+                content = stream.read(limit if header_only else limit + 1)
+            after = os.fstat(descriptor)
+            if (opened.st_size, opened.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+                raise ScanCoverageError("unreadable")
+        finally:
+            os.close(descriptor)
+    except OSError as exc:
+        raise ScanCoverageError("unreadable") from exc
+    if not header_only and len(content) > limit:
+        raise ScanCoverageError("oversized")
+    return content
+
+
+def safe_write_text(path: Path, content: str, *, label: str = "output") -> Path:
+    """Atomically write a report without following a final symlink.
+
+    A report path can be supplied by an untrusted workflow input. ``Path.write_text``
+    follows a replaced/dangling symlink, so write a temporary sibling and replace
+    the directory entry instead. Parent symlinks are rejected too: resolving one
+    would let a repository-controlled link redirect an apparently local report
+    outside the intended workspace.
+    """
+    requested = Path(path)
+    absolute = Path(os.path.abspath(os.fspath(requested)))
+    parent = absolute.parent
+    try:
+        current = Path(parent.anchor) if parent.anchor else Path()
+        for component in parent.parts:
+            if component == parent.anchor:
+                continue
+            current /= component
+            metadata = current.lstat()
+            if is_link_or_reparse(metadata):
+                raise ValueError(
+                    f"{label} directory contains a symlink or reparse point: {current}"
+                )
+            if not stat_module.S_ISDIR(metadata.st_mode):
+                raise ValueError(f"{label} parent is not a directory: {current}")
+    except FileNotFoundError as exc:
+        raise ValueError(f"{label} directory is unavailable: {parent}") from exc
+    except OSError as exc:
+        raise ValueError(f"{label} directory is unavailable: {parent}") from exc
+    destination = parent / absolute.name
+    try:
+        metadata = destination.lstat()
+    except FileNotFoundError:
+        metadata = None
+    except OSError as exc:
+        raise ValueError(f"{label} path is unavailable: {destination}") from exc
+    if metadata is not None and (
+        stat_module.S_ISLNK(metadata.st_mode) or not stat_module.S_ISREG(metadata.st_mode)
+    ):
+        raise ValueError(f"{label} path must be a regular file, not a symlink or directory")
+    temporary_name: str | None = None
+    try:
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{destination.name}.", suffix=".tmp", dir=str(parent)
+        )
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_name, destination)
+        temporary_name = None
+    except OSError as exc:
+        raise ValueError(f"could not write {label}: {destination}") from exc
+    finally:
+        if temporary_name:
+            with contextlib.suppress(OSError):
+                os.unlink(temporary_name)
+    return destination
+
+
 def scan_single_file(
     path: Path,
     relative_path: str,
     max_file_bytes: int,
     detected_frameworks: frozenset[str] | None,
+    skill_context: bool = False,
 ) -> list[Finding]:
-    """Scan one file with both engines; shared by sequential and parallel paths."""
+    """Scan one file with both engines; shared by sequential and parallel paths.
+
+    Expected omissions raise ScanCoverageError; the worker transports a typed
+    outcome separately from findings so no sentinel can masquerade as evidence.
+    """
     if path.suffix.lower() in {".sqlite", ".sqlite3", ".db"}:
-        try:
-            header = path.read_bytes()[:16]
-        except OSError:
-            return []
+        header = read_scannable_bytes(path, 16, header_only=True)
         if header.startswith(b"SQLite format 3") or path.suffix.lower() in {".sqlite", ".sqlite3"}:
             return [
                 make_finding(
@@ -15640,14 +17004,32 @@ def scan_single_file(
             ]
         return []
     try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return []
+        text = read_scannable_bytes(path, max_file_bytes).decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ScanCoverageError("unreadable") from exc
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
     lines = text.splitlines()
-    python_tree = parse_python_source(text) if path.suffix.lower() == ".py" else None
+    # Python's backtracking ``re`` engine is intentionally dependency-free, so
+    # a hostile single-line source file could otherwise make one pattern spend
+    # quadratic time searching an unbounded line. Do not truncate the line and
+    # claim coverage: transport the omission to the ledger and let production
+    # gates fail closed.
+    if any(len(line) > MAX_SCAN_LINE_CHARS for line in lines):
+        raise ScanCoverageError("line_limit")
+    python_tree = parse_python_source(text, strict=True) if path.suffix.lower() == ".py" else None
     python_string_lines = multiline_string_lines(python_tree) if python_tree is not None else None
+    doc_lines = (
+        precision_policy.docstring_lines(python_tree) if python_tree is not None else frozenset()
+    )
     file_findings = find_regex_issues(
-        path, relative_path, text, lines, python_string_lines, detected_frameworks
+        path,
+        relative_path,
+        text,
+        lines,
+        python_string_lines,
+        detected_frameworks,
+        skill_context,
+        docstring_lines=doc_lines,
     )
     if python_tree is not None:
         prefixes = comment_line_prefixes(path)
@@ -15655,32 +17037,105 @@ def scan_single_file(
         file_findings.extend(
             find_python_ast_issues(relative_path, text, lines, python_tree, ignore_ids)
         )
-    return file_findings
+    return precision_policy.apply_file_precision(
+        file_findings,
+        relative_path=relative_path,
+        source_text=text,
+        secret_rule_ids=SECRET_RULE_IDS,
+        source_path=str(path),
+    )
 
 
-def _scan_file_task(task: tuple[str, str, int, tuple[str, ...] | None]) -> list[Finding]:
+def _scan_file_task(
+    task: tuple[str, str, int, tuple[str, ...] | None, bool],
+) -> tuple[list[Finding], str | None]:
     """Pool worker entry point: unpack one scan task and return its findings."""
-    path_text, relative_path, max_file_bytes, frameworks = task
+    path_text, relative_path, max_file_bytes, frameworks, skill_context = task
     detected = frozenset(frameworks) if frameworks is not None else None
-    return scan_single_file(Path(path_text), relative_path, max_file_bytes, detected)
+    try:
+        return scan_single_file(
+            Path(path_text), relative_path, max_file_bytes, detected, skill_context
+        ), None
+    except ScanCoverageError as exc:
+        return [], exc.reason
+
+
+def _tracked_paths_for_scan(root: Path) -> frozenset[str]:
+    """Return Git-index paths so committed ignored-tree files stay visible.
+
+    The normal walker prunes dependency/build trees for bounded performance.
+    A committed file in one of those trees is part of the review surface,
+    however, and must not disappear merely because its parent directory is
+    conventionally ignored. Git's NUL-delimited output keeps unusual names
+    unambiguous; the shared bounded runner also strips repository-level Git
+    overrides and refuses a repository-local Git executable.
+    """
+    status, output, _ = _run_git_bounded(
+        root,
+        ["ls-files", "--cached", "-z", "--"],
+        timeout_seconds=10,
+        max_output_bytes=8_000_000,
+    )
+    if status != 0:
+        raise ValueError("git index listing failed")
+    paths: set[str] = set()
+    for raw_path in output.split("\0"):
+        if not raw_path:
+            continue
+        relative = raw_path.replace("\\", "/")
+        if (
+            relative.startswith("/")
+            or "\x00" in relative
+            or any(part in {"", ".", ".."} for part in relative.split("/"))
+        ):
+            raise ValueError("git index returned an unsafe relative path")
+        paths.add(relative)
+    return frozenset(paths)
+
+
+def _has_prunable_tree(root: Path) -> bool:
+    """Cheaply determine whether Git-index discovery is needed.
+
+    Avoid a Git subprocess for ordinary repositories with no dependency/build
+    trees (and for callers that only select normal source files). The walk is
+    bounded by returning as soon as a prunable directory is observed; Git's
+    own metadata is ignored because it never contains tracked worktree paths.
+    """
+    try:
+        for _directory, subdirectories, _filenames in os.walk(
+            root, topdown=True, followlinks=False
+        ):
+            if any(name in SKIP_DIRS - {".git"} for name in subdirectories):
+                return True
+            subdirectories[:] = [name for name in subdirectories if name != ".git"]
+    except OSError:
+        # A walk failure is already incomplete evidence; ask for the index so
+        # a tracked ignored file cannot be silently hidden by the same failure.
+        return True
+    return False
 
 
 def scan_repository(
     root: Path,
     max_file_bytes: int = 1_000_000,
-    baseline: set[str] | None = None,
+    baseline: SuppressionBaseline | set[str] | None = None,
     exclude_patterns: Sequence[str] = (),
     include_paths: frozenset[str] | None = None,
     cross_file: bool = False,
     jobs: int = 1,
+    excluded_paths: frozenset[str] | None = None,
+    scan_profile: str | None = None,
+    inspect_archives: bool = False,
 ) -> tuple[list[Finding], dict[str, object]]:
     repository_root = root.resolve()
     if not repository_root.is_dir():
         raise ValueError(f"not a directory: {repository_root}")
     if jobs < 1:
         raise ValueError("jobs must be at least 1")
-    findings: list[Finding] = []
-    frameworks = detect_frameworks(repository_root)
+    if max_file_bytes < 1:
+        raise ValueError("max-file-bytes must be positive")
+    findings: list[Finding] = BoundedFindings(MAX_FINDINGS_TOTAL)
+    frameworks = detect_frameworks(repository_root, max_file_bytes)
     # Without any manifest at all, framework state is unknown (do not downgrade
     # structural framework findings); with manifests present, an undeclared
     # framework is real evidence the rule may be a look-alike.
@@ -15689,14 +17144,85 @@ def scan_repository(
     )
     framework_tuple = tuple(sorted(frameworks)) if detected_frameworks is not None else None
     normalized_excludes = normalize_exclude_patterns(exclude_patterns)
-    tasks: list[tuple[str, str, int, tuple[str, ...] | None]] = []
+    baseline_exclusions = excluded_paths or frozenset()
+    task_candidates: list[tuple[str, str, int, tuple[str, ...] | None]] = []
+    skill_roots = discover_skill_roots(repository_root, normalized_excludes)
+    git_index_unavailable = False
+    tracked_paths: frozenset[str] | None = frozenset()
+    # A nested scan root may not contain its worktree's .git marker. In that
+    # case there is no safe index to consult and the historical pruning remains
+    # the only bounded option. For a real worktree, inability to read the
+    # index is itself incomplete evidence rather than a reason to claim green.
+    if (repository_root / ".git").exists() and _has_prunable_tree(repository_root):
+        try:
+            tracked_paths = _tracked_paths_for_scan(repository_root)
+        except ValueError:
+            tracked_paths = None
+            git_index_unavailable = True
+    coverage = {
+        "unreadable": 0,
+        "parser_limit": 0,
+        "line_limit": 0,
+        "oversized": 0,
+        "containers": 0,
+        "assets": 0,
+        "binary": 0,
+        "symlinks": 0,
+        "excluded": 0,
+        "databases": 0,
+        "baseline_excluded": 0,
+    }
     files_scanned = 0
-    for path in iter_scannable_files(repository_root, max_file_bytes, normalized_excludes):
-        relative_path = path.relative_to(repository_root).as_posix()
-        if include_paths is not None and relative_path not in include_paths:
+    pending_containers: list[tuple[Path, str]] = []
+    for path, relative_path, skip_reason in iter_scannable_files(
+        repository_root,
+        max_file_bytes,
+        normalized_excludes,
+        include_paths,
+        tracked_paths,
+    ):
+        if skip_reason == "walk_error":
+            coverage["unreadable"] += 1
             continue
-        files_scanned += 1
-        tasks.append((str(path), relative_path, max_file_bytes, framework_tuple))
+        if not _coverage_path_selected(
+            relative_path, include_paths, directory=skip_reason == "symlink"
+        ):
+            continue
+        if relative_path in baseline_exclusions:
+            coverage["baseline_excluded"] += 1
+            continue
+        if skip_reason is None:
+            if path.suffix.lower() in DATABASE_SUFFIXES:
+                coverage["databases"] += 1
+            task_candidates.append((str(path), relative_path, max_file_bytes, framework_tuple))
+        elif skip_reason == "excluded":
+            coverage["excluded"] += 1
+        elif skip_reason == "container":
+            pending_containers.append((path, relative_path))
+        elif skip_reason == "asset":
+            coverage["assets"] += 1
+        elif skip_reason == "binary":
+            coverage["binary"] += 1
+        elif skip_reason == "symlink":
+            coverage["symlinks"] += 1
+        elif skip_reason == "size":
+            coverage["oversized"] += 1
+        elif skip_reason == "unreadable":
+            coverage["unreadable"] += 1
+
+    tasks = [(*task, is_within_skill_root(task[1], skill_roots)) for task in task_candidates]
+    scanned_paths: set[str] = set()
+    discovered_coverage = coverage.copy()
+
+    def record_result(task, outcome):
+        nonlocal files_scanned
+        file_findings, omission = outcome
+        if omission is not None:
+            coverage[omission] += 1
+        else:
+            files_scanned += 1
+            scanned_paths.add(task[1])
+            findings.extend(file_findings)
 
     if jobs > 1 and len(tasks) >= PARALLEL_MIN_FILES:
         # Parallel scanning keeps byte-identical output: tasks run in walk
@@ -15709,8 +17235,10 @@ def scan_repository(
             with ProcessPoolExecutor(
                 max_workers=worker_jobs, initializer=_worker_initializer
             ) as executor:
-                for file_findings in executor.map(_scan_file_task, tasks, chunksize=4):
-                    findings.extend(file_findings)
+                for task, outcome in zip(
+                    tasks, executor.map(_scan_file_task, tasks, chunksize=4), strict=True
+                ):
+                    record_result(task, outcome)
         except (OSError, ImportError, RuntimeError) as exc:
             # RuntimeError covers BrokenProcessPool: when this module was
             # imported under a non-canonical name (embedding tools, notebooks),
@@ -15721,20 +17249,68 @@ def scan_repository(
                 "continuing sequentially",
                 file=sys.stderr,
             )
-            findings = []
+            # Preserve the same total cap after a worker-pool fallback. A
+            # plain list here would re-open the OOM path the bound is meant to
+            # close when many files each approach the per-file limit.
+            findings = BoundedFindings(MAX_FINDINGS_TOTAL)
+            files_scanned = 0
+            scanned_paths.clear()
+            coverage = discovered_coverage.copy()
             for task in tasks:
-                findings.extend(_scan_file_task(task))
+                record_result(task, _scan_file_task(task))
     else:
         for task in tasks:
-            findings.extend(
-                scan_single_file(Path(task[0]), task[1], max_file_bytes, detected_frameworks)
+            record_result(task, _scan_file_task(task))
+
+    remaining_containers: list[tuple[Path, str]] = []
+    for path, relative_path in pending_containers:
+        if (
+            not inspect_archives
+            or path.suffix.lower() not in archive_inspect.ZIP_INSPECTABLE_SUFFIXES
+        ):
+            remaining_containers.append((path, relative_path))
+            continue
+        inspection = archive_inspect.inspect_zip_archive(
+            path, relative_path, text_suffixes=TEXT_SUFFIXES
+        )
+        member_omission = False
+        for member in inspection.members:
+            try:
+                extra = lint_source_snippet(member.source_text, member.virtual_path)
+            except ScanCoverageError as exc:
+                coverage[exc.reason] = coverage.get(exc.reason, 0) + 1
+                member_omission = True
+                continue
+            findings.extend(extra)
+            files_scanned += 1
+            scanned_paths.add(member.virtual_path)
+        if not inspection.complete or member_omission:
+            remaining_containers.append((path, relative_path))
+    coverage["containers"] += len(remaining_containers)
+
+    environment_paths = {path for path in scanned_paths if _is_sensitive_env_path(path)}
+    if environment_paths:
+        try:
+            status, index_output, _ = _run_git_bounded(
+                repository_root,
+                ["ls-files", "--cached", "-z", "--"],
+                timeout_seconds=10,
+                max_output_bytes=2_000_000,
             )
+            if status != 0:
+                git_index_unavailable = True
+            else:
+                findings.extend(
+                    find_tracked_env_issues(environment_paths, set(index_output.split("\0")))
+                )
+        except ValueError:
+            git_index_unavailable = True
 
     if cross_file:
         try:
             cross_findings, flow_count, unsanitized_count = collect_cross_file_taint(
                 repository_root,
-                allowed_paths=frozenset(task[1] for task in tasks),
+                allowed_paths=frozenset(scanned_paths),
                 max_file_bytes=max_file_bytes,
             )
         except (OSError, ValueError, RecursionError, MemoryError) as exc:
@@ -15742,9 +17318,41 @@ def scan_repository(
         findings.extend(cross_findings)
 
     active, suppressed = deduplicate_and_suppress_findings(findings, baseline)
+    profile = (
+        scan_profile
+        if scan_profile in {"application", "library"}
+        else (precision_policy.detect_scan_profile(scanned_paths, active))
+    )
+    active = precision_policy.apply_library_mode(active, profile, SECRET_RULE_IDS)
+    # Omitted or uninspected content must remain visible in the evidence
+    # ledger. Parser failures are especially important: syntax-invalid or
+    # pathological Python can otherwise hide every AST finding.
+    reasons = [
+        name
+        for name, counter in (
+            ("unreadable", coverage["unreadable"]),
+            ("parser_limit", coverage["parser_limit"]),
+            ("line_limit", coverage["line_limit"]),
+            ("oversized", coverage["oversized"]),
+            ("containers", coverage["containers"]),
+            ("symlinks", coverage["symlinks"]),
+            ("binary", coverage["binary"]),
+        )
+        if counter
+    ]
+    if git_index_unavailable:
+        reasons.append("git_index_unavailable")
+    completeness = {
+        "is_complete": not reasons,
+        "reasons": reasons,
+        **coverage,
+    }
     stats = {
         "files_scanned": files_scanned,
-        "suppressed": suppressed,
+        "suppressed": len(suppressed),
+        "completeness": completeness,
+        "scan_profile": profile,
+        "_suppressed": suppressed,
     }
     if cross_file:
         stats["cross_file_flows"] = flow_count
@@ -15754,22 +17362,62 @@ def scan_repository(
     return active, stats
 
 
-def determine_verdict(findings: Sequence[Finding], include_tests: bool = False) -> str:
+def determine_verdict(
+    findings: Sequence[Finding],
+    include_tests: bool = False,
+    completeness: dict[str, object] | None = None,
+    *,
+    block_min_proof: str = "L1",
+) -> str:
     evaluated = findings if include_tests else [item for item in findings if item.scope == "app"]
-    severities = {item.severity for item in evaluated}
-    if severities & {"critical", "high"}:
+    reportable = [item for item in evaluated if not precision_policy.is_advisory(item)]
+    gate_items = [
+        item
+        for item in reportable
+        if precision_policy.is_gate_finding(
+            item, block_min_proof=block_min_proof, secret_rule_ids=SECRET_RULE_IDS
+        )
+    ]
+    gate_severities = {item.severity for item in gate_items}
+    reportable_severities = {item.severity for item in reportable}
+    if gate_severities & {"critical", "high"}:
         return "BLOCK"
-    if severities & {"medium", "low"}:
+    if reportable_severities & {"critical", "high"}:
+        return "REVIEW"
+    if reportable_severities & {"medium", "low"}:
+        return "CONDITIONAL"
+    if completeness is not None and not completeness.get("is_complete", True):
+        # Omitted content must never be reported as a complete pass.
         return "CONDITIONAL"
     return "PASS_WITH_EVIDENCE"
 
 
-def gate_failed(findings: Sequence[Finding], fail_on: str, include_tests: bool = False) -> bool:
+def gate_failed(
+    findings: Sequence[Finding],
+    fail_on: str,
+    include_tests: bool = False,
+    *,
+    completeness: object = None,
+    fail_on_incomplete: bool = False,
+    block_min_proof: str = "L1",
+) -> bool:
     """Evaluate the documented severity gate for a set of findings."""
+    if (
+        fail_on_incomplete
+        and isinstance(completeness, dict)
+        and not completeness.get("is_complete", True)
+    ):
+        return True
     if fail_on == "none":
         return False
     evaluated = findings if include_tests else [item for item in findings if item.scope == "app"]
-    return any(SEVERITY[item.severity] <= SEVERITY[fail_on] for item in evaluated)
+    return any(
+        SEVERITY[item.severity] <= SEVERITY[fail_on]
+        and precision_policy.is_gate_finding(
+            item, block_min_proof=block_min_proof, secret_rule_ids=SECRET_RULE_IDS
+        )
+        for item in evaluated
+    )
 
 
 def build_decision_trace(
@@ -15784,6 +17432,8 @@ def build_decision_trace(
     baseline_fingerprints: int,
     changed_candidates: int | None,
     findings_before_confidence_filter: int,
+    fail_on_incomplete: bool = False,
+    block_min_proof: str = "L1",
 ) -> dict[str, object]:
     """Explain a gate decision with bounded, content-free, deterministic counts."""
     evaluated = (
@@ -15792,7 +17442,13 @@ def build_decision_trace(
     blocking = (
         0
         if fail_on == "none"
-        else sum(SEVERITY[item.severity] <= SEVERITY[fail_on] for item in evaluated)
+        else sum(
+            SEVERITY[item.severity] <= SEVERITY[fail_on]
+            and precision_policy.is_gate_finding(
+                item, block_min_proof=block_min_proof, secret_rule_ids=SECRET_RULE_IDS
+            )
+            for item in evaluated
+        )
     )
     selection: dict[str, object] = {
         "mode": "changed" if changed_candidates is not None else "repository",
@@ -15804,7 +17460,7 @@ def build_decision_trace(
     }
     if changed_candidates is not None:
         selection["changed_candidates"] = changed_candidates
-    return {
+    result = {
         "rule_selection": {
             "catalog_rules": len(RULES),
             "detected_frameworks": list(stats.get("frameworks", [])),
@@ -15820,10 +17476,27 @@ def build_decision_trace(
         "gate": {
             "threshold": fail_on,
             "include_tests": include_tests,
-            "failed": blocking > 0,
-            "verdict": determine_verdict(findings, include_tests),
+            "failed": gate_failed(
+                findings,
+                fail_on,
+                include_tests,
+                completeness=stats.get("completeness"),
+                fail_on_incomplete=fail_on_incomplete,
+                block_min_proof=block_min_proof,
+            ),
+            "verdict": determine_verdict(
+                findings,
+                include_tests,
+                stats.get("completeness"),
+                block_min_proof=block_min_proof,
+            ),
+            "block_min_proof": block_min_proof,
         },
     }
+    profile = stats.get("scan_profile")
+    if profile in {"application", "library"}:
+        result["gate"]["scan_profile"] = profile
+    return result
 
 
 MAX_HISTORY_OUTPUT_BYTES = 16_000_000
@@ -15838,19 +17511,25 @@ def _run_git_bounded(
     max_output_bytes: int = MAX_HISTORY_OUTPUT_BYTES,
 ) -> tuple[int, str, str]:
     """Run trusted Git with bounded stdout+stderr and no project code execution."""
-    git_location = shutil.which("git")
-    if not git_location:
-        raise ValueError("git-history evidence is unavailable: git was not found")
-    git_binary = Path(git_location).resolve()
+    git_binary = _trusted_git_binary(root)
     repository_root = root.resolve()
-    try:
-        git_binary.relative_to(repository_root)
-    except ValueError:
-        pass
-    else:
-        raise ValueError("git-history evidence refused a git executable inside the scan root")
 
     environment = os.environ.copy()
+    # Caller/project Git overrides must not redirect evidence to a different
+    # repository/index or inject config that executes a filesystem monitor.
+    for name in tuple(environment):
+        if name in {
+            "GIT_DIR",
+            "GIT_COMMON_DIR",
+            "GIT_WORK_TREE",
+            "GIT_INDEX_FILE",
+            "GIT_OBJECT_DIRECTORY",
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+            "GIT_CONFIG",
+            "GIT_CONFIG_PARAMETERS",
+            "GIT_CONFIG_COUNT",
+        } or name.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_")):
+            environment.pop(name)
     environment.update(
         {
             "GIT_CONFIG_NOSYSTEM": "1",
@@ -15866,6 +17545,8 @@ def _run_git_bounded(
                 "--no-pager",
                 "-c",
                 "core.quotePath=false",
+                "-c",
+                "core.fsmonitor=false",
                 "-C",
                 str(repository_root),
                 *arguments,
@@ -15936,6 +17617,21 @@ def _is_sensitive_env_path(relative_path: str) -> bool:
         )
         is not None
     )
+
+
+def find_tracked_env_issues(selected_paths: set[str], tracked_paths: set[str]) -> list[Finding]:
+    """Filename risk backed by Git-index membership, never text mentioning .env."""
+    return [
+        make_finding(
+            find_rule("SP220"),
+            relative_path,
+            1,
+            "Git index contains a sensitive environment filename; contents are not verified.",
+            "artifact",
+        )
+        for relative_path in sorted(selected_paths & tracked_paths)
+        if _is_sensitive_env_path(relative_path)
+    ]
 
 
 def _scan_history_secrets(root: Path, max_commits: int = 500) -> tuple[list[Finding], int]:
@@ -16057,13 +17753,26 @@ def build_json_report(
     stats: dict[str, object],
     include_tests: bool = False,
     decision_trace: dict[str, object] | None = None,
+    *,
+    block_min_proof: str = "L1",
 ) -> dict[str, object]:
+    if len(findings) > MAX_FINDINGS_TOTAL:
+        raise FindingLimitError(f"finding output exceeded the total limit of {MAX_FINDINGS_TOTAL}")
+    # Keys prefixed with "_" are internal transports (e.g. the suppressed
+    # finding list) and must never leak into the public summary.
+    public_stats = {key: value for key, value in stats.items() if not key.startswith("_")}
+    completeness = public_stats.get("completeness")
     app_findings = [f for f in findings if f.scope == "app"]
     test_findings = [f for f in findings if f.scope == "test"]
     limitations = [
         "Fast heuristic scan; confirm every finding.",
         "No runtime reachability or dependency CVE database.",
     ]
+    if isinstance(completeness, dict) and not completeness.get("is_complete", True):
+        reasons = ", ".join(str(reason) for reason in completeness.get("reasons", []))
+        limitations.append(
+            f"Scan coverage is incomplete ({reasons}); a zero-finding result is not a complete pass."
+        )
     if "history_commits_scanned" in stats:
         limitations.append(
             "Git-history evidence covers bounded added patch lines; rotate confirmed credentials."
@@ -16074,12 +17783,17 @@ def build_json_report(
         "schema_version": "1.0",
         "tool": {"name": "ShipProof", "version": VERSION, "command": "scan"},
         "root": str(root.resolve()),
-        "verdict": determine_verdict(findings, include_tests),
+        "verdict": determine_verdict(
+            findings,
+            include_tests,
+            completeness if isinstance(completeness, dict) else None,
+            block_min_proof=block_min_proof,
+        ),
         "summary": {
             "findings": len(findings),
             "app_findings": len(app_findings),
             "test_findings": len(test_findings),
-            **stats,
+            **public_stats,
             "by_severity": dict(Counter(item.severity for item in findings)),
         },
         "findings": [_finding_payload(item) for item in findings],
@@ -16113,42 +17827,92 @@ def render_decision_trace(decision_trace: dict[str, object], *, markdown: bool) 
     return ["  Decision trace:", *[f"    {value}" for value in values], ""]
 
 
+def render_suppressed_section(
+    suppressed: Sequence[tuple[Finding, str]], *, markdown: bool
+) -> list[str]:
+    """Auditable listing of suppressed findings with their baseline reasons."""
+    if not suppressed:
+        return []
+    lines = (
+        ["## Suppressed findings", ""] if markdown else ["  Suppressed findings (baseline):", ""]
+    )
+    for item, reason in suppressed[:200]:
+        safe_path = terminal_safe_text(item.path).replace("`", "\\`")
+        location = f"`{safe_path}:{item.line}`" if markdown else f"{safe_path}:{item.line}"
+        shown_reason = terminal_safe_text(reason or "(no reason recorded)")
+        if markdown:
+            lines.append(f"- {item.severity.upper()} {item.rule_id} at {location} — {shown_reason}")
+        else:
+            lines.append(f"  - {item.severity.upper()} {item.rule_id} at {location}")
+            lines.append(f"    reason: {shown_reason}")
+    if len(suppressed) > 200:
+        lines.append(
+            f"- …and {len(suppressed) - 200} more suppressed findings."
+            if markdown
+            else f"  - …and {len(suppressed) - 200} more."
+        )
+    lines.append("")
+    return lines
+
+
 def render_markdown_report(
     root: Path,
     findings: Sequence[Finding],
     stats: dict[str, object],
+    suppressed: Sequence[tuple[Finding, str]] = (),
     decision_trace: dict[str, object] | None = None,
+    *,
+    include_tests: bool = False,
+    block_min_proof: str = "L1",
 ) -> str:
+    completeness = stats.get("completeness")
     counts = Counter(item.severity for item in findings)
+    display, collapsed_notes = precision_policy.collapse_for_display(findings)
     lines = [
         "# ShipProof report",
         "",
-        f"**Verdict:** {determine_verdict(findings)}",
+        f"**Verdict:** {determine_verdict(findings, include_tests=include_tests, completeness=completeness if isinstance(completeness, dict) else None, block_min_proof=block_min_proof)}",
         "",
         f"Scanned `{stats['files_scanned']}` files; found `{len(findings)}` active issues; suppressed `{stats['suppressed']}`.",
         "",
-        "| Critical | High | Medium | Low |",
-        "| ---: | ---: | ---: | ---: |",
-        f"| {counts['critical']} | {counts['high']} | {counts['medium']} | {counts['low']} |",
-        "",
     ]
-    for item in findings:
+    if isinstance(completeness, dict) and not completeness.get("is_complete", True):
+        reasons = ", ".join(str(reason) for reason in completeness.get("reasons", []))
         lines.extend(
             [
-                f"## {item.severity.upper()} · {item.rule_id} · {item.title}",
-                "",
-                f"`{item.path}:{item.line}` · confidence: `{item.confidence}` · scope: `{item.scope}` · {item.category}",
-                "",
-                f"> {item.evidence}",
-                "",
-                item.message,
-                "",
-                f"**Fix:** {item.remediation}",
-                "",
-                f"Mapping: `{item.cwe}` · `{item.owasp}` · fingerprint `{item.fingerprint}`",
+                f"**Coverage:** incomplete ({reasons}); a zero-finding result is not a complete pass.",
                 "",
             ]
         )
+    lines.extend(
+        [
+            "| Critical | High | Medium | Low |",
+            "| ---: | ---: | ---: | ---: |",
+            f"| {counts['critical']} | {counts['high']} | {counts['medium']} | {counts['low']} |",
+            "",
+        ]
+    )
+    for item in display:
+        safe_path = terminal_safe_text(item.path).replace("`", "\\`")
+        lines.extend(
+            [
+                f"## {item.severity.upper()} · {terminal_safe_text(item.rule_id)} · {terminal_safe_text(item.title)}",
+                "",
+                f"`{safe_path}:{item.line}` · confidence: `{terminal_safe_text(item.confidence)}` · scope: `{terminal_safe_text(item.scope)}` · {terminal_safe_text(item.category)}",
+                "",
+                f"> {terminal_safe_text(item.evidence)}",
+                "",
+                terminal_safe_text(item.message),
+                "",
+                f"**Fix:** {terminal_safe_text(item.remediation)}",
+                "",
+                f"Mapping: `{terminal_safe_text(item.cwe)}` · `{terminal_safe_text(item.owasp)}` · fingerprint `{terminal_safe_text(item.fingerprint)}`",
+                "",
+            ]
+        )
+    if collapsed_notes:
+        lines.extend(["## Collapsed findings", "", *[f"- {note}" for note in collapsed_notes], ""])
+    lines.extend(render_suppressed_section(suppressed, markdown=True))
     if decision_trace is not None:
         lines.extend(render_decision_trace(decision_trace, markdown=True))
     lines.extend(
@@ -16171,12 +17935,14 @@ def read_source_context(
     """Read surrounding lines from source for terminal display."""
     try:
         source_path = root / relative_path
-        text = source_path.read_text(encoding="utf-8", errors="replace")
+        text = read_scannable_bytes(source_path, MAX_SNIPPET_BYTES).decode(
+            "utf-8", errors="replace"
+        )
         source_lines = text.splitlines()
         start = max(0, target_line - 1 - context)
         end = min(len(source_lines), target_line + context)
-        return [(i + 1, source_lines[i]) for i in range(start, end)]
-    except OSError:
+        return [(i + 1, terminal_safe_text(source_lines[i])) for i in range(start, end)]
+    except (OSError, ScanCoverageError, UnicodeError):
         return []
 
 
@@ -16187,7 +17953,7 @@ def read_finding_context(
 ) -> list[tuple[int, str]]:
     """Return context without re-reading credential material hidden by a finding."""
     if finding.rule_id in SECRET_RULE_IDS:
-        return [(finding.line, finding.evidence)]
+        return [(finding.line, terminal_safe_text(finding.evidence))]
     return read_source_context(root, finding.path, finding.line, context=context)
 
 
@@ -16196,18 +17962,39 @@ def render_terminal_report(
     findings: Sequence[Finding],
     stats: dict[str, object],
     decision_trace: dict[str, object] | None = None,
+    suppressed: Sequence[tuple[Finding, str]] = (),
+    *,
+    include_tests: bool = False,
+    block_min_proof: str = "L1",
 ) -> str:
     """Render a code-review style terminal report with emoji, context, and evidence."""
-    verdict = determine_verdict(findings)
+    completeness = stats.get("completeness")
+    verdict = determine_verdict(
+        findings,
+        include_tests=include_tests,
+        completeness=completeness if isinstance(completeness, dict) else None,
+        block_min_proof=block_min_proof,
+    )
     counts = Counter(item.severity for item in findings)
     lines: list[str] = []
 
     # Header
-    icon = "\u2705" if verdict == "PASS_WITH_EVIDENCE" else "\u274c"
+    icon = (
+        "\u2705"
+        if verdict == "PASS_WITH_EVIDENCE"
+        else "\u26a0"
+        if verdict == "REVIEW"
+        else "\u274c"
+    )
     lines.append(f"\n  {icon} ShipProof: {verdict}")
     lines.append(
         f"  Scanned {stats['files_scanned']} files \u2022 {len(findings)} findings \u2022 {stats['suppressed']} suppressed"
     )
+    if isinstance(completeness, dict) and not completeness.get("is_complete", True):
+        reasons = ", ".join(str(reason) for reason in completeness.get("reasons", []))
+        lines.append(
+            f"  \u26a0 Coverage incomplete ({reasons}); zero findings is not a complete pass."
+        )
     if counts:
         parts = []
         for sev in ("critical", "high", "medium", "low"):
@@ -16217,14 +18004,20 @@ def render_terminal_report(
         lines.append(f"  {bullet.join(parts)}")
     lines.append("")
 
+    display, collapsed_notes = precision_policy.collapse_for_display(findings)
     # Findings
-    for item in findings:
+    for item in display:
         icon = SEVERITY_ICON.get(item.severity, "")
-        conf_label = CONFIDENCE_LABEL.get(item.confidence, item.confidence)
-        scope_suffix = f" \u2022 scope: {item.scope}" if item.scope != "app" else ""
-        lines.append(f"  {icon} {item.severity.upper()} \u2014 {item.title} ({item.rule_id})")
+        safe_title = terminal_safe_text(item.title)
+        safe_rule_id = terminal_safe_text(item.rule_id)
+        safe_path = terminal_safe_text(item.path)
+        safe_confidence = terminal_safe_text(item.confidence)
+        safe_scope = terminal_safe_text(item.scope)
+        conf_label = terminal_safe_text(CONFIDENCE_LABEL.get(item.confidence, safe_confidence))
+        scope_suffix = f" \u2022 scope: {safe_scope}" if item.scope != "app" else ""
+        lines.append(f"  {icon} {item.severity.upper()} \u2014 {safe_title} ({safe_rule_id})")
         lines.append(
-            f"     {item.path}:{item.line}  \u2022  confidence: {conf_label}{scope_suffix}"
+            f"     {safe_path}:{item.line}  \u2022  confidence: {conf_label}{scope_suffix}"
         )
         lines.append("")
 
@@ -16238,11 +18031,17 @@ def render_terminal_report(
             lines.append("")
 
         # Why + Fix
-        lines.append(f"     Why: {item.message}")
-        lines.append(f"     Fix: {item.remediation}")
-        lines.append(f"     Ref: {item.cwe} \u2022 {item.owasp}")
+        lines.append(f"     Why: {terminal_safe_text(item.message)}")
+        lines.append(f"     Fix: {terminal_safe_text(item.remediation)}")
+        lines.append(
+            f"     Ref: {terminal_safe_text(item.cwe)} \u2022 {terminal_safe_text(item.owasp)}"
+        )
         lines.append("")
         lines.append("  " + "\u2500" * 70)
+        lines.append("")
+
+    for note in collapsed_notes:
+        lines.append(f"  {note}")
         lines.append("")
 
     if findings:
@@ -16251,6 +18050,8 @@ def render_terminal_report(
         )
         lines.append("  \u2192 Run `shipproof scan --format json` for machine-readable output")
         lines.append("")
+
+    lines.extend(render_suppressed_section(suppressed, markdown=False))
 
     if decision_trace is not None:
         lines.extend(render_decision_trace(decision_trace, markdown=False))
@@ -16263,11 +18064,18 @@ def render_github_annotations(findings: Sequence[Finding]) -> str:
     lines: list[str] = []
     for item in findings:
         level = "error" if item.severity in ("critical", "high") else "warning"
-        position = f"file={item.path},line={item.line}"
-        title = f"{item.rule_id} {item.title}".replace(",", "%2C")
+        safe_path = terminal_safe_text(item.path).replace("%", "%25").replace(",", "%2C")
+        position = f"file={safe_path},line={item.line}"
+        title = (
+            terminal_safe_text(f"{item.rule_id} {item.title}")
+            .replace("%", "%25")
+            .replace(",", "%2C")
+        )
         column_suffix = f",col={item.column}" if item.column is not None else ""
         message = (
-            f"{item.message} Fix: {item.remediation}".replace("\r", " ")
+            terminal_safe_text(f"{item.message} Fix: {item.remediation}")
+            .replace("%", "%25")
+            .replace("\r", " ")
             .replace("\n", " ")
             .replace("::", "")
         )
@@ -16570,6 +18378,7 @@ def run_autofix(
     root: Path,
     findings: Sequence[Finding],
     dry_run: bool = False,
+    max_file_bytes: int = 1_000_000,
 ) -> tuple[int, list[str]]:
     """Apply deterministic autofixes and verify them with a re-scan loop."""
     fixed_count = 0
@@ -16582,10 +18391,10 @@ def run_autofix(
 
     for rel_path, file_findings in files_to_fix.items():
         file_path = root / rel_path
-        if not file_path.is_file():
-            continue
         try:
-            content = file_path.read_text(encoding="utf-8", errors="replace")
+            content = read_scannable_bytes(file_path, max_file_bytes).decode(
+                "utf-8", errors="replace"
+            )
             lines = content.splitlines()
             file_modified = False
 
@@ -16609,18 +18418,18 @@ def run_autofix(
             if file_modified:
                 if not dry_run:
                     new_content = "\n".join(lines) + ("\n" if content.endswith("\n") else "")
-                    file_path.write_text(new_content, encoding="utf-8")
+                    safe_write_text(file_path, new_content, label="autofix output")
                     modified_files.add(file_path)
                 fixed_count += file_fixed_count
                 messages.extend(file_messages)
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             messages.append(f"[ERROR] Failed to fix {rel_path}: {exc}")
 
     if modified_files and not dry_run:
         messages.append("\n-- Autofix Verification Loop --")
         for m_path in sorted(modified_files):
             rel_str = str(m_path.relative_to(root))
-            m_text = m_path.read_text(encoding="utf-8")
+            m_text = read_scannable_bytes(m_path, max_file_bytes).decode("utf-8", errors="replace")
             re_findings = find_regex_issues(m_path, rel_str, m_text)
             if m_path.suffix.lower() == ".py":
                 re_findings.extend(find_python_ast_issues(rel_str, m_text))
@@ -16802,6 +18611,8 @@ def _finding_payload(item: Finding) -> dict[str, object]:
     payload: dict[str, object] = asdict(item)
     if payload.get("history_commit") is None:
         payload.pop("history_commit", None)
+    if payload.get("scan_profile") is None:
+        payload.pop("scan_profile", None)
     scaffold = build_fix_scaffold(item)
     if scaffold is not None:
         payload["fix_scaffold"] = scaffold
@@ -16970,8 +18781,17 @@ def _git_provenance(root: Path | None) -> list[dict[str, str]] | None:
         return None
 
 
-def build_sarif_report(findings: Sequence[Finding], root: Path | None = None) -> dict[str, object]:
+def build_sarif_report(
+    findings: Sequence[Finding],
+    root: Path | None = None,
+    suppressed: Sequence[tuple[Finding, str]] = (),
+    completeness: dict[str, object] | None = None,
+) -> dict[str, object]:
+    if len(findings) + len(suppressed) > MAX_FINDINGS_TOTAL:
+        raise FindingLimitError(f"SARIF output exceeded the total limit of {MAX_FINDINGS_TOTAL}")
     rules: dict[str, Finding] = {item.rule_id: item for item in findings}
+    for item, _reason in suppressed:
+        rules.setdefault(item.rule_id, item)
     level = {
         "critical": "error",
         "high": "error",
@@ -17037,6 +18857,42 @@ def build_sarif_report(findings: Sequence[Finding], root: Path | None = None) ->
                 }
             ]
         results.append(result_entry)
+    for item, reason in suppressed:
+        results.append(
+            {
+                "ruleId": item.rule_id,
+                "level": level.get(item.severity, "note"),
+                "message": {"text": item.message},
+                "locations": [
+                    {
+                        "physicalLocation": {
+                            "artifactLocation": {"uri": item.path},
+                            "region": {"startLine": item.line},
+                        }
+                    }
+                ],
+                "partialFingerprints": {"shipproof/v1": item.fingerprint},
+                # Suppressed findings stay in the report as auditable external
+                # suppressions instead of vanishing from the evidence trail.
+                "suppressions": [
+                    {
+                        "kind": "external",
+                        "status": "accepted",
+                        "justification": reason
+                        or "suppressed by legacy baseline (no reason recorded)",
+                    }
+                ],
+                "properties": {
+                    "severity": item.severity,
+                    "confidence": item.confidence,
+                    "detection": item.detection,
+                    "proof_level": item.proof_level,
+                    "scope": item.scope,
+                    "verification_status": item.verification_status,
+                    "cwe": item.cwe,
+                },
+            }
+        )
     run: dict[str, object] = {
         "tool": {
             "driver": {
@@ -17069,6 +18925,20 @@ def build_sarif_report(findings: Sequence[Finding], root: Path | None = None) ->
         "results": results,
         "automationDetails": {"id": f"shipproof/{VERSION}"},
     }
+    if completeness is not None:
+        complete = bool(completeness.get("is_complete", False))
+        run["properties"] = {"completeness": completeness}
+        invocation: dict[str, object] = {"executionSuccessful": complete}
+        if not complete:
+            invocation["toolExecutionNotifications"] = [
+                {
+                    "level": "warning",
+                    "message": {
+                        "text": "Scan coverage is incomplete; zero results do not establish a clean scan."
+                    },
+                }
+            ]
+        run["invocations"] = [invocation]
     provenance = _git_provenance(root)
     if provenance is not None:
         run["versionControlProvenance"] = provenance
@@ -17094,7 +18964,45 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--baseline-out", type=Path, help="Write active fingerprints as a reviewable baseline"
     )
+    parser.add_argument(
+        "--baseline-reason",
+        default="Generated baseline; review required",
+        help="Reason recorded by --baseline-out (default: Generated baseline; review required)",
+    )
+    parser.add_argument(
+        "--show-suppressed",
+        action="store_true",
+        default=False,
+        help="List suppressed findings with their baseline reasons in the report",
+    )
+    coverage_group = parser.add_mutually_exclusive_group()
+    coverage_group.add_argument(
+        "--fail-on-incomplete",
+        dest="fail_on_incomplete",
+        action="store_true",
+        default=None,
+        help="Fail when repository scan coverage is incomplete (default)",
+    )
+    coverage_group.add_argument(
+        "--allow-incomplete",
+        dest="allow_incomplete",
+        action="store_true",
+        default=False,
+        help="Explicit exploratory override: keep exit 0 when coverage is incomplete",
+    )
     parser.add_argument("--fail-on", choices=tuple(SEVERITY), default="high")
+    parser.add_argument(
+        "--block-min-proof",
+        choices=("L0", "L1", "L2"),
+        default="L1",
+        help="Minimum proof level for a finding to fail the gate (default: L1)",
+    )
+    parser.add_argument(
+        "--scan-profile",
+        choices=("auto", "application", "library"),
+        default="auto",
+        help="application keeps authored severity; library downranks app-oriented rules",
+    )
     parser.add_argument(
         "--include-tests",
         action="store_true",
@@ -17131,6 +19039,16 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
         choices=CONTEXT_LEVELS,
         default="full",
         help="Detail level for --explain or --fix-prompt (default: full)",
+    )
+    parser.add_argument(
+        "--packet-out",
+        metavar="DIR",
+        default=None,
+        help=(
+            "Write bounded opt-in review packets for the user's own agent to an "
+            "existing directory (local artifacts only, never sent anywhere; "
+            "does not change the gate verdict)"
+        ),
     )
     parser.add_argument(
         "--trace",
@@ -17192,6 +19110,12 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=1,
         help="Scan files with N worker processes (deterministic; 1 stays sequential)",
     )
+    parser.add_argument(
+        "--inspect-archives",
+        action="store_true",
+        default=False,
+        help="Opt-in bounded ZIP/Office member inspection; default omits containers",
+    )
     return parser.parse_args(argv)
 
 
@@ -17217,6 +19141,26 @@ def main(argv: Sequence[str] | None = None) -> int:
             "shipproof: --trace is supported only for repository scan output in json, markdown, or terminal format",
             file=sys.stderr,
         )
+        return 2
+
+    if arguments.show_suppressed and (
+        arguments.explain
+        or arguments.fix_prompt
+        or arguments.fix
+        or arguments.fix_dry_run
+        or arguments.snippet is not None
+        or arguments.snippet_stdin
+        or arguments.format == "github"
+    ):
+        print(
+            "shipproof: --show-suppressed requires a repository report in json, markdown, terminal, or sarif",
+            file=sys.stderr,
+        )
+        return 2
+    if (arguments.fail_on_incomplete or arguments.allow_incomplete) and (
+        arguments.explain or arguments.snippet is not None or arguments.snippet_stdin
+    ):
+        print("shipproof: coverage override requires a repository scan", file=sys.stderr)
         return 2
 
     # Handle --explain mode (no scan needed)
@@ -17253,10 +19197,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("shipproof: snippet stdin must be valid UTF-8", file=sys.stderr)
             return 2
     if snippet is not None:
-        findings = lint_source_snippet(snippet, arguments.snippet_file)
+        try:
+            findings = lint_source_snippet(snippet, arguments.snippet_file)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            print(f"shipproof: {exc}", file=sys.stderr)
+            return 2
         payload = build_json_report(arguments.root, findings, {"files_scanned": 1, "suppressed": 0})
         print(json.dumps(payload, indent=2))
         return 0 if not findings else 1
+
+    # Repository scans are production evidence. Incomplete discovery must not
+    # silently become a green exit code; only an explicit exploratory override
+    # may opt out. The positive flag remains accepted for readable command
+    # intent and backwards-compatible command lines.
+    arguments.fail_on_incomplete = not arguments.allow_incomplete
 
     try:
         if arguments.max_file_bytes <= 0:
@@ -17268,28 +19222,57 @@ def main(argv: Sequence[str] | None = None) -> int:
             if arguments.changed_since
             else None
         )
-        baseline_fingerprints = load_baseline_fingerprints(arguments.baseline)
+        baseline_data = load_baseline_fingerprints(arguments.baseline)
+        if arguments.baseline_out:
+            _baseline_reason(arguments.baseline_reason)
+        if (
+            baseline_data.scanner_version is not None
+            and baseline_data.scanner_version.split(".", 1)[0] != VERSION.split(".", 1)[0]
+        ):
+            print(
+                f"shipproof: warning: baseline was generated by scanner "
+                f"{baseline_data.scanner_version}; fingerprints may not match {VERSION}",
+                file=sys.stderr,
+            )
+        scan_root = Path(arguments.root).resolve()
+        baseline_exclusions = frozenset(
+            relative
+            for relative in (
+                _path_inside_root(scan_root, arguments.baseline),
+                _path_inside_root(scan_root, arguments.baseline_out),
+            )
+            if relative is not None
+        )
         findings, stats = scan_repository(
             arguments.root,
             max_file_bytes=arguments.max_file_bytes,
             # History findings must participate in the same deduplication and
             # baseline pass as live findings. Defer suppression until the two
             # evidence streams have been combined.
-            baseline=None if arguments.history else baseline_fingerprints,
+            baseline=None if arguments.history else baseline_data,
             exclude_patterns=arguments.exclude,
             include_paths=include_paths,
             cross_file=arguments.cross_file,
             jobs=arguments.jobs,
+            excluded_paths=baseline_exclusions,
+            scan_profile=None if arguments.scan_profile == "auto" else arguments.scan_profile,
+            inspect_archives=arguments.inspect_archives,
         )
+        suppressed_records = list(stats.pop("_suppressed", []))
         if arguments.changed_since:
             stats["changed_since"] = arguments.changed_since
         if arguments.history:
             history_findings, history_commits = _scan_history_secrets(arguments.root)
+            if len(findings) + len(history_findings) > MAX_FINDINGS_TOTAL:
+                raise FindingLimitError(
+                    f"finding output exceeded the total limit of {MAX_FINDINGS_TOTAL}"
+                )
             findings.extend(history_findings)
             findings, history_suppressed = deduplicate_and_suppress_findings(
-                findings, baseline_fingerprints
+                findings, baseline_data
             )
-            stats["suppressed"] = int(stats["suppressed"]) + history_suppressed
+            stats["suppressed"] = int(stats["suppressed"]) + len(history_suppressed)
+            suppressed_records.extend(history_suppressed)
             stats["history_commits_scanned"] = history_commits
             stats["history_findings"] = len(history_findings)
 
@@ -17310,9 +19293,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 max_file_bytes=arguments.max_file_bytes,
                 min_confidence=arguments.min_confidence,
                 exclude_patterns=arguments.exclude,
-                baseline_fingerprints=len(baseline_fingerprints),
+                baseline_fingerprints=len(baseline_data.fingerprints),
                 changed_candidates=len(include_paths) if include_paths is not None else None,
                 findings_before_confidence_filter=findings_before_confidence_filter,
+                fail_on_incomplete=arguments.fail_on_incomplete,
+                block_min_proof=arguments.block_min_proof,
             )
 
         payload = build_json_report(
@@ -17321,16 +19306,53 @@ def main(argv: Sequence[str] | None = None) -> int:
             stats,
             include_tests=arguments.include_tests,
             decision_trace=decision_trace,
+            block_min_proof=arguments.block_min_proof,
         )
+        if arguments.show_suppressed and suppressed_records:
+            payload["suppressed_findings"] = [
+                {**_finding_payload(item), "suppression_reason": reason}
+                for item, reason in suppressed_records
+            ]
         if arguments.baseline_out:
-            arguments.baseline_out.write_text(
+            if len(findings) > MAX_BASELINE_FINGERPRINTS:
+                raise ValueError("baseline output exceeds the fingerprint count limit")
+            for item in findings:
+                _baseline_matcher(item.path, "fingerprint path")
+            baseline_output = (
                 json.dumps(
-                    {"version": 1, "fingerprints": [item.fingerprint for item in findings]},
+                    {
+                        "version": 2,
+                        "scanner_version": VERSION,
+                        "rules": [
+                            {
+                                key: value
+                                for key, value in {
+                                    "id": rule.rule_id,
+                                    "path": rule.path,
+                                    "evidence": rule.evidence,
+                                    "reason": rule.reason,
+                                }.items()
+                                if value
+                            }
+                            for rule in baseline_data.rules
+                        ],
+                        "fingerprints": [
+                            {
+                                "hash": item.fingerprint,
+                                "rule_id": item.rule_id,
+                                "path": item.path,
+                                "reason": arguments.baseline_reason,
+                            }
+                            for item in findings
+                        ],
+                    },
                     indent=2,
                 )
-                + "\n",
-                encoding="utf-8",
+                + "\n"
             )
+            if len(baseline_output.encode("utf-8")) > MAX_BASELINE_BYTES:
+                raise ValueError("baseline output exceeds the byte limit")
+            safe_write_text(arguments.baseline_out, baseline_output, label="baseline output")
 
         # Handle --fix / --fix-dry-run mode
         if arguments.fix or arguments.fix_dry_run:
@@ -17342,8 +19364,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             action_label = "Dry-run completed" if arguments.fix_dry_run else "Autofix completed"
             print(f"\n{action_label}: {fixed_count} findings remediated.")
             verified_findings = findings
+            verified_stats = stats
             if fixed_count > 0 and not arguments.fix_dry_run:
-                verified_findings, _ = scan_repository(
+                verified_findings, verified_stats = scan_repository(
                     arguments.root,
                     max_file_bytes=arguments.max_file_bytes,
                     baseline=load_baseline_fingerprints(arguments.baseline),
@@ -17351,6 +19374,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     include_paths=include_paths,
                     cross_file=arguments.cross_file,
                     jobs=arguments.jobs,
+                    excluded_paths=baseline_exclusions,
+                    scan_profile=None
+                    if arguments.scan_profile == "auto"
+                    else arguments.scan_profile,
+                    inspect_archives=arguments.inspect_archives,
                 )
                 if arguments.min_confidence:
                     min_conf = CONFIDENCE[arguments.min_confidence]
@@ -17362,7 +19390,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             return (
                 1
                 if gate_failed(
-                    verified_findings, arguments.fail_on, include_tests=arguments.include_tests
+                    verified_findings,
+                    arguments.fail_on,
+                    include_tests=arguments.include_tests,
+                    completeness=verified_stats.get("completeness"),
+                    fail_on_incomplete=arguments.fail_on_incomplete,
+                    block_min_proof=arguments.block_min_proof,
                 )
                 else 0
             )
@@ -17388,6 +19421,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     findings,
                     stats,
                     decision_trace=decision_trace,
+                    suppressed=suppressed_records if arguments.show_suppressed else (),
+                    include_tests=arguments.include_tests,
+                    block_min_proof=arguments.block_min_proof,
                 )
             elif fmt == "markdown":
                 output = render_markdown_report(
@@ -17395,20 +19431,74 @@ def main(argv: Sequence[str] | None = None) -> int:
                     findings,
                     stats,
                     decision_trace=decision_trace,
+                    suppressed=suppressed_records if arguments.show_suppressed else (),
+                    include_tests=arguments.include_tests,
+                    block_min_proof=arguments.block_min_proof,
                 )
             elif fmt == "sarif":
-                output = json.dumps(build_sarif_report(findings, arguments.root), indent=2)
+                output = json.dumps(
+                    build_sarif_report(
+                        findings,
+                        arguments.root,
+                        suppressed=suppressed_records,
+                        completeness=stats.get("completeness"),
+                    ),
+                    indent=2,
+                )
             elif fmt == "github":
                 output = render_github_annotations(findings)
+                if not stats["completeness"]["is_complete"]:
+                    output += "\n::warning::ShipProof scan coverage is incomplete; zero findings do not establish a clean scan."
             else:
                 output = json.dumps(payload, indent=2)
 
         if arguments.output:
-            arguments.output.write_text(
-                output + ("" if output.endswith("\n") else "\n"), encoding="utf-8"
+            safe_write_text(
+                arguments.output,
+                output + ("" if output.endswith("\n") else "\n"),
+                label="report output",
             )
         else:
             print(output)
+        if arguments.packet_out is not None:
+            # Opt-in review packets ride alongside the report; they never
+            # change findings, verdicts, or exit codes on their own.
+            try:
+                import review_packets
+            except ImportError as exc:
+                raise ValueError(f"review packets unavailable: {exc}") from exc
+            packet_report = review_packets.build_packets(
+                arguments.root,
+                findings,
+                policy={
+                    "fail_on": arguments.fail_on,
+                    "block_min_proof": arguments.block_min_proof,
+                    "include_tests": bool(arguments.include_tests),
+                },
+                scanner_version=f"shipproof-scan/{VERSION}",
+                rules_identity=f"executable-rules/{len(RULES)}",
+            )
+            out_dir = Path(arguments.packet_out)
+            if not out_dir.is_dir() or out_dir.is_symlink():
+                raise ValueError(f"packet output must be an existing directory: {out_dir}")
+            safe_write_text(
+                out_dir / "ledger.json",
+                json.dumps(packet_report, indent=2) + "\n",
+                label="packet ledger",
+            )
+            for packet in packet_report["packets"]:
+                safe_write_text(
+                    out_dir / f"{packet['packet_id']}.json",
+                    json.dumps(packet, indent=2) + "\n",
+                    label="review packet",
+                )
+            counts = packet_report["counts"]
+            print(
+                f"review packets: {counts['packets']} packets, "
+                f"{counts['scheduled']} scheduled, {counts['deferred']} deferred "
+                f"-> {out_dir}",
+                file=sys.stderr,
+            )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"shipproof: {exc}", file=sys.stderr)
         return 2
@@ -17417,8 +19507,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     # Gating: default evaluates app scope findings only unless --include-tests is set
-    if gate_failed(findings, arguments.fail_on, include_tests=arguments.include_tests):
+    if gate_failed(
+        findings,
+        arguments.fail_on,
+        include_tests=arguments.include_tests,
+        block_min_proof=arguments.block_min_proof,
+    ):
         return 1
+    if arguments.fail_on_incomplete:
+        completeness = stats.get("completeness")
+        if isinstance(completeness, dict) and not completeness.get("is_complete", True):
+            reasons = ", ".join(str(reason) for reason in completeness.get("reasons", []))
+            print(f"shipproof: scan coverage incomplete ({reasons})", file=sys.stderr)
+            return 1
     return 0
 
 

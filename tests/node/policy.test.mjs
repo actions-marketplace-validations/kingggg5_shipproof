@@ -35,6 +35,22 @@ test("rejects paths outside the repository", () => {
   assert.throws(() => buildPolicyGates(internals.PACKAGE_ROOT, policy), /requested path/);
 });
 
+test("repository policy coverage gate accepts only a boolean (check remains fail-closed)", () => {
+  for (const enabled of [undefined, false, true]) {
+    const policy = validatePolicy({ version: 1, security: { fail_on_incomplete: enabled } });
+    const [gate] = buildPolicyGates(internals.PACKAGE_ROOT, policy);
+    assert.equal(gate.argumentsList.includes("--fail-on-incomplete"), enabled === true);
+  }
+  for (const invalid of ["false", "true", 0, 1, null, [], {}]) {
+    assert.throws(
+      () => validatePolicy({ version: 1, security: { fail_on_incomplete: invalid } }),
+      /fail_on_incomplete must be a boolean/,
+    );
+  }
+  const parsed = parsePolicyText("version: 1\nsecurity:\n  fail_on_incomplete: true\n");
+  assert.equal(validatePolicy(parsed).security.fail_on_incomplete, true);
+});
+
 test("allowMissing permits only an absent policy, not a wrong path type", () => {
   const root = mkdtempSync(join(tmpdir(), "shipproof-policy-"));
   try {
@@ -47,6 +63,29 @@ test("allowMissing permits only an absent policy, not a wrong path type", () => 
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("scan profile and proof floor are explicit policy keys", () => {
+  const policy = validatePolicy({
+    version: 1,
+    scan: { profile: "library" },
+    security: { block_min_proof: "L2" },
+  });
+  assert.equal(policy.scan.profile, "library");
+  assert.equal(policy.security.block_min_proof, "L2");
+  const [gate] = buildPolicyGates(internals.PACKAGE_ROOT, policy);
+  assert.ok(gate.argumentsList.includes("--scan-profile"));
+  assert.ok(gate.argumentsList.includes("library"));
+  assert.ok(gate.argumentsList.includes("--block-min-proof"));
+  assert.ok(gate.argumentsList.includes("L2"));
+  assert.throws(
+    () => validatePolicy({ version: 1, scan: { profile: "service" } }),
+    /scan.profile must be auto, application, or library/,
+  );
+  assert.throws(
+    () => validatePolicy({ version: 1, security: { block_min_proof: "L3" } }),
+    /security.block_min_proof must be L0, L1, or L2/,
+  );
 });
 
 test("capacity accepts reviewed numeric inputs and rejects unknown fields", () => {

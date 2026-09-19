@@ -69,6 +69,30 @@ class RuleAssuranceInventoryTests(unittest.TestCase):
             len(baseline["uncontracted_ids"]),
             report["summary"]["uncontracted"],
         )
+        self.assertEqual(
+            len(baseline["high_critical_without_realistic_negative_ids"]),
+            report["summary"]["high_critical_without_realistic_negatives"],
+        )
+        self.assertGreater(report["summary"]["realistic_negatives"], 0)
+
+    def test_precision_plan_context_rules_have_realistic_negatives(self) -> None:
+        report = build_report()
+        by_id = {item["rule_id"]: item for item in report["rules"]}
+        for rule_id in (
+            "SP019",
+            "SP101",
+            "SP106",
+            "SP117",
+            "SP140",
+            "SP147",
+            "SP307",
+            "SP310",
+            "SP367",
+            "SP505",
+            "SP526",
+            "SP636",
+        ):
+            self.assertEqual(by_id[rule_id]["negative_quality"], "realistic", rule_id)
 
     def test_report_is_deterministic_and_the_published_summary_is_derived(self) -> None:
         first = build_report()

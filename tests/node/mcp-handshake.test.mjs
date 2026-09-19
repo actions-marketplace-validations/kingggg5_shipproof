@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -16,6 +16,58 @@ try {
 } catch (error) {
   unavailable = error instanceof Error ? error.message : String(error);
 }
+
+test(
+  "MCP scan evidence refreshes after same-size same-mtime edits and deletion even with legacy cache enabled",
+  { skip: unavailable ? `optional MCP peers are not installed: ${unavailable}` : false },
+  async () => {
+    const repositoryRoot = mkdtempSync(join(tmpdir(), "shipproof-mcp-freshness-"));
+    const filename = join(repositoryRoot, "sample.py");
+    const safe = "value = 1\n".padEnd(128, " ");
+    // High-entropy secret stays L0-allowlisted so the freshness probe still BLOCKs
+    // after the default proof floor moved to L1.
+    const risky = ("api_" + "key = '" + "K7mQ2xR9" + "nP4wL8sT3vY1'\n").padEnd(128, " ");
+    writeFileSync(filename, safe, "utf8");
+    const fixedTime = new Date("2020-01-01T00:00:00Z");
+    utimesSync(filename, fixedTime, fixedTime);
+    const original = statSync(filename);
+    const environment = Object.fromEntries(
+      Object.entries({
+        ...process.env,
+        SHIPPROOF_MCP_ROOT: repositoryRoot,
+        SHIPPROOF_MCP_CACHE_MS: "60000",
+      }).filter((entry) => typeof entry[1] === "string"),
+    );
+    const transport = new StdioClientTransport({
+      command: process.execPath, args: [SERVER_ENTRY], cwd: ROOT, env: environment, stderr: "pipe",
+    });
+    const client = new Client({ name: "shipproof-freshness-test", version: "1.0.0" });
+    const scan = async () => {
+      const result = await client.callTool({ name: "shipproof_scan", arguments: { path: ".", fail_on: "high" } });
+      assert.equal(result.isError, undefined);
+      return result.structuredContent;
+    };
+    try {
+      await client.connect(transport, { timeout: 10_000 });
+      assert.equal((await scan()).verdict, "PASS_WITH_EVIDENCE");
+      writeFileSync(filename, risky, "utf8");
+      utimesSync(filename, original.atime, original.mtime);
+      assert.equal(statSync(filename).size, original.size);
+      assert.equal(statSync(filename).mtimeMs, original.mtimeMs);
+      const failed = await scan();
+      assert.equal(failed.verdict, "BLOCK");
+      assert.ok(failed.findings.some((finding) => ["critical", "high"].includes(finding.severity)));
+      writeFileSync(filename, safe, "utf8");
+      utimesSync(filename, original.atime, original.mtime);
+      assert.equal((await scan()).verdict, "PASS_WITH_EVIDENCE");
+      rmSync(filename);
+      assert.equal((await scan()).summary.files_scanned, 0);
+    } finally {
+      await client.close();
+      rmSync(repositoryRoot, { recursive: true, force: true });
+    }
+  },
+);
 
 test(
   "MCP SDK handshake lists strict schemas and validates real structured output",
@@ -76,6 +128,24 @@ test(
       assert.equal(nestedScan.isError, undefined);
       assert.equal(nestedScan.structuredContent.root, realpathSync.native(unicodeSubdirectory));
       assert.equal(nestedScan.structuredContent.summary.files_scanned, 1);
+
+      const coverageInput = byName.shipproof_scan.inputSchema.properties.fail_on_incomplete;
+      assert.equal(coverageInput.type, "boolean");
+      assert.equal(coverageInput.default, true);
+      writeFileSync(join(repositoryRoot, "bundle.zip"), "uninspected container", "utf8");
+      const incompleteScan = await client.callTool({
+        name: "shipproof_scan",
+        arguments: { path: ".", fail_on: "none", fail_on_incomplete: true },
+      });
+      assert.equal(incompleteScan.isError, undefined);
+      assert.equal(incompleteScan.structuredContent.verdict, "CONDITIONAL");
+      assert.equal(incompleteScan.structuredContent.summary.completeness.is_complete, false);
+      assert.equal(incompleteScan.structuredContent.decision_trace.gate.failed, true);
+      const invalidCoverage = await client.callTool({
+        name: "shipproof_scan",
+        arguments: { fail_on_incomplete: "true" },
+      });
+      assert.equal(invalidCoverage.isError, true);
 
       const explanation = await client.callTool({
         name: "shipproof_explain",

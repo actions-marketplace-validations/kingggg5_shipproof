@@ -1005,6 +1005,341 @@
           "rationale": "A dict-based override uses a colon rather than an assignment and lies outside this detector's documented shape."
         }
       ]
+    },
+    {
+      "rule_id": "SP666",
+      "expected_severity": "medium",
+      "expected_confidence": "low",
+      "blocking_eligible": false,
+      "sources": [
+        {
+          "url": "https://www.php.net/manual/en/features.file-upload.php",
+          "claim": "PHP documents uploaded-file metadata and temporary paths separately, so browser-reported type metadata is not content validation."
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/434.html",
+          "claim": "CWE-434 describes unrestricted upload acceptance and requires validation that is stronger than attacker-controlled filename or MIME metadata."
+        }
+      ],
+      "false_positive_analysis": "The check is deliberately narrow: it requires a direct $_FILES type value in an if or in_array decision on a PHP file. Logging, finfo content inspection, exif_imagetype, validator helpers, aliases, computed metadata keys, and later authoritative checks stay silent. A matched branch may still be only a preliminary UI decision, so the finding is advisory until the upload flow is reviewed.",
+      "positive": [
+        {
+          "path": "upload.php",
+          "source": "if ($_FILES['upload']['type'] === 'image/png') { move_uploaded_file($_FILES['upload']['tmp_name'], $dst); }"
+        },
+        {
+          "path": "avatar.php",
+          "source": "$allowed = in_array($_FILES[\"avatar\"][\"type\"], [\"image/jpeg\"], true); if ($allowed) { accept_upload(); }"
+        },
+        {
+          "path": "document.php",
+          "source": "if ($_FILES['doc']['type'] === 'application/pdf') { store_uploaded_file($_FILES['doc']['tmp_name']); }"
+        }
+      ],
+      "negative": [
+        {
+          "path": "upload.php",
+          "source": "$finfo = new finfo(FILEINFO_MIME_TYPE); $mime = $finfo->file($_FILES['upload']['tmp_name']); if ($mime === 'image/png') { accept_upload(); }"
+        },
+        {
+          "path": "image.php",
+          "source": "$kind = exif_imagetype($_FILES['image']['tmp_name']); if ($kind === IMAGETYPE_PNG) { accept_upload(); }"
+        },
+        {
+          "path": "audit.php",
+          "source": "error_log($_FILES['upload']['type']);"
+        },
+        {
+          "path": "validator.php",
+          "source": "$validator->validateUploadedFile($_FILES['upload']);"
+        },
+        {
+          "path": "alias.php",
+          "source": "$reported = $_FILES['upload']['type']; if ($reported === 'image/png') { accept_upload(); }"
+        }
+      ],
+      "adversarial": [
+        {
+          "path": "computed.php",
+          "source": "$field = 'type'; if ($_FILES['upload'][$field] === 'image/png') { accept_upload(); }",
+          "expected": false,
+          "rationale": "A computed metadata key requires local data-flow and is intentionally outside the direct literal boundary of this advisory rule."
+        },
+        {
+          "path": "alias.php",
+          "source": "$reported = $_FILES['upload']['type']; if ($reported === 'image/png') { accept_upload(); }",
+          "expected": false,
+          "rationale": "An alias can carry browser metadata into a later branch, but tracing that flow without an AST engine would create noisy matches."
+        }
+      ]
+    },
+    {
+      "rule_id": "SP667",
+      "expected_severity": "medium",
+      "expected_confidence": "low",
+      "blocking_eligible": false,
+      "sources": [
+        {
+          "url": "https://pkg.go.dev/net/http#Cookie",
+          "claim": "Go's net/http Cookie exposes HttpOnly as an explicit attribute that prevents client-side scripts from reading the cookie."
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/1004.html",
+          "claim": "CWE-1004 covers sensitive cookies without HttpOnly and the resulting exposure to script-based theft after XSS."
+        }
+      ],
+      "false_positive_analysis": "The detector only recognizes a direct http.SetCookie call whose literal cookie has a sensitive-looking Name and no HttpOnly: true field before the closing brace. Theme cookies, helper-returned cookies, computed names, post-construction assignments, and deliberately script-readable non-sensitive cookies remain silent. Because helper context is unavailable, the result is advisory.",
+      "positive": [
+        {
+          "path": "session.go",
+          "source": "http.SetCookie(w, &http.Cookie{Name: \"session\", Value: token})"
+        },
+        {
+          "path": "auth.go",
+          "source": "http.SetCookie(w, &http.Cookie{Name: \"auth\", Secure: true, Value: token})"
+        },
+        {
+          "path": "refresh.go",
+          "source": "http.SetCookie(w, &Cookie{Name: \"refresh\", SameSite: http.SameSiteLaxMode, Value: value})"
+        }
+      ],
+      "negative": [
+        {
+          "path": "session.go",
+          "source": "http.SetCookie(w, &http.Cookie{Name: \"session\", HttpOnly: true, Secure: true, Value: token})"
+        },
+        {
+          "path": "theme.go",
+          "source": "http.SetCookie(w, &http.Cookie{Name: \"theme\", Value: value})"
+        },
+        {
+          "path": "session.go",
+          "source": "cookie := secureSessionCookie(token); http.SetCookie(w, cookie)"
+        },
+        {
+          "path": "session.go",
+          "source": "name := \"session\"; http.SetCookie(w, &http.Cookie{Name: name, Value: token})"
+        },
+        {
+          "path": "session.txt",
+          "source": "http.SetCookie(w, &http.Cookie{Name: \"session\", Value: token})"
+        }
+      ],
+      "adversarial": [
+        {
+          "path": "session.go",
+          "source": "cookie := &http.Cookie{Name: \"session\", Value: token}; cookie.HttpOnly = true; http.SetCookie(w, cookie)",
+          "expected": false,
+          "rationale": "Object-flow after construction is not visible to a bounded literal pattern, so a safe post-assignment must remain silent."
+        },
+        {
+          "path": "session.go",
+          "source": "http.SetCookie(w, secureSessionCookie(token))",
+          "expected": false,
+          "rationale": "A helper may set HttpOnly and Secure internally; reporting without inspecting the helper would create a false positive."
+        }
+      ]
+    },
+    {
+      "rule_id": "SP668",
+      "expected_severity": "medium",
+      "expected_confidence": "medium",
+      "blocking_eligible": false,
+      "sources": [
+        {
+          "url": "https://wiki.sei.cmu.edu/confluence/display/c/FIO30-C.+Exclude+user+input+from+format+strings",
+          "claim": "CERT C FIO30-C requires externally controlled data to stay out of printf-family format-string positions."
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/134.html",
+          "claim": "CWE-134 describes externally controlled format strings that can disclose or modify process memory."
+        }
+      ],
+      "false_positive_analysis": "The detector requires argv[index] directly in the format argument of printf, syslog, fprintf, sprintf, or snprintf and only runs on C/C++ suffixes. Literal formats with argv as data, local aliases, validated wrappers, and pointer arithmetic remain silent. The direct command-line shape is strong evidence but not a complete taint proof, so this first promotion is advisory.",
+      "positive": [
+        {
+          "path": "main.c",
+          "source": "int main(int argc, char **argv) { printf(argv[1]); }"
+        },
+        {
+          "path": "logger.cpp",
+          "source": "void log(char **argv) { fprintf(stderr, argv[1]); }"
+        },
+        {
+          "path": "buffer.c",
+          "source": "void print(char **argv) { snprintf(buf, sizeof buf, argv[1]); }"
+        }
+      ],
+      "negative": [
+        {
+          "path": "main.c",
+          "source": "int main(int argc, char **argv) { printf(\"%s\", argv[1]); }"
+        },
+        {
+          "path": "logger.cpp",
+          "source": "void log(char **argv) { const char *fmt = \"%s\"; printf(fmt, argv[1]); }"
+        },
+        {
+          "path": "safe.c",
+          "source": "void log(const char *user) { printf(\"%s\", user); }"
+        },
+        {
+          "path": "syslog.c",
+          "source": "void log(char **argv) { syslog(LOG_ERR, \"%s\", argv[1]); }"
+        },
+        {
+          "path": "main.txt",
+          "source": "printf(argv[1]);"
+        }
+      ],
+      "adversarial": [
+        {
+          "path": "main.c",
+          "source": "int main(int argc, char **argv_safe) { printf(argv_safe[1]); }",
+          "expected": false,
+          "rationale": "A similarly named safe variable is not the exact argv source recognized by this deliberately narrow detector."
+        },
+        {
+          "path": "main.c",
+          "source": "int main(int argc, char **argv) { printf(argv + 1); }",
+          "expected": false,
+          "rationale": "Pointer arithmetic needs semantic analysis and is outside this direct-index signature; it must not be guessed as a format-string finding."
+        }
+      ]
+    },
+    {
+      "rule_id": "SP669",
+      "expected_severity": "medium",
+      "expected_confidence": "low",
+      "blocking_eligible": false,
+      "sources": [
+        {
+          "url": "https://pub.dev/packages/shared_preferences",
+          "claim": "The shared_preferences package provides ordinary key-value persistence and is not documented as a secure credential vault for secrets or bearer tokens."
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/922.html",
+          "claim": "CWE-922 covers sensitive data stored without adequate protection and the resulting disclosure through local storage or backups."
+        }
+      ],
+      "false_positive_analysis": "The rule requires a literal sensitive key in a setString call on SharedPreferences or a conventional prefs variable and only runs on Dart files. Theme settings, encrypted-storage wrappers, getString reads, computed keys, and non-sensitive preference names stay silent. A demo token may still be benign, so this first implementation is advisory and must be reviewed against the device threat model.",
+      "positive": [
+        {
+          "path": "auth.dart",
+          "source": "final prefs = await SharedPreferences.getInstance();\nawait prefs.setString('token', accessToken);"
+        },
+        {
+          "path": "session.dart",
+          "source": "final prefs = await SharedPreferences.getInstance();\nawait prefs.setString(\"refresh_token\", refreshToken);"
+        },
+        {
+          "path": "credentials.dart",
+          "source": "final prefs = await SharedPreferences.getInstance();\nawait prefs.setString('password', password);"
+        }
+      ],
+      "negative": [
+        {
+          "path": "settings.dart",
+          "source": "final prefs = await SharedPreferences.getInstance();\nawait prefs.setBool('dark_mode', enabled);"
+        },
+        {
+          "path": "secure.dart",
+          "source": "final storage = const FlutterSecureStorage();\nawait storage.write(key: 'token', value: accessToken);"
+        },
+        {
+          "path": "read.dart",
+          "source": "final token = prefs.getString('token');"
+        },
+        {
+          "path": "prefs.dart",
+          "source": "await preferences.setString('locale', 'th');"
+        },
+        {
+          "path": "keys.dart",
+          "source": "final key = credentialKey;\nawait prefs.setString(key, value);"
+        }
+      ],
+      "adversarial": [
+        {
+          "path": "auth.dart",
+          "source": "final prefs = await SharedPreferences.getInstance();\nawait prefs.setString('api_key_name', label);",
+          "expected": false,
+          "rationale": "A key name that merely contains api_key as part of a non-secret label is not one of the bounded credential literals."
+        },
+        {
+          "path": "auth.dart",
+          "source": "final securePrefs = EncryptedPreferences();\nawait securePrefs.setString('token', accessToken);",
+          "expected": false,
+          "rationale": "An encrypted wrapper is intentionally outside the SharedPreferences signature and must remain silent."
+        }
+      ]
+    },
+    {
+      "rule_id": "SP670",
+      "expected_severity": "medium",
+      "expected_confidence": "low",
+      "blocking_eligible": false,
+      "sources": [
+        {
+          "url": "https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/migrate-from-xml",
+          "claim": "Microsoft's XML guidance treats external entities and resolver configuration as security-sensitive parser behavior that must be explicitly controlled."
+        },
+        {
+          "url": "https://cwe.mitre.org/data/definitions/611.html",
+          "claim": "CWE-611 covers XML external entity resolution and the disclosure or network access caused by unsafe parser settings."
+        }
+      ],
+      "false_positive_analysis": "The rule only recognizes direct DtdProcessing.Parse or construction of XmlUrlResolver/XmlSecureResolver in C# configuration. Prohibit, Ignore, null resolvers, JSON parsing, and helper-returned settings stay silent. Trusted offline XML may intentionally use DTDs, so the advisory finding requires deployment and input-flow review.",
+      "positive": [
+        {
+          "path": "XmlParser.cs",
+          "source": "var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Parse };\nusing var reader = XmlReader.Create(stream, settings);"
+        },
+        {
+          "path": "XmlParser.cs",
+          "source": "var settings = new XmlReaderSettings();\nsettings.XmlResolver = new XmlUrlResolver();"
+        },
+        {
+          "path": "XmlParser.cs",
+          "source": "var settings = new XmlReaderSettings { XmlResolver = new XmlSecureResolver(new XmlUrlResolver(), credential) };"
+        }
+      ],
+      "negative": [
+        {
+          "path": "XmlParser.cs",
+          "source": "var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null };"
+        },
+        {
+          "path": "XmlParser.cs",
+          "source": "var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore };"
+        },
+        {
+          "path": "JsonParser.cs",
+          "source": "var payload = JsonSerializer.Deserialize<Model>(body);"
+        },
+        {
+          "path": "XmlParser.cs",
+          "source": "var settings = CreateHardenedSettings();\nusing var reader = XmlReader.Create(stream, settings);"
+        },
+        {
+          "path": "XmlParser.cs",
+          "source": "var settings = new XmlReaderSettings { XmlResolver = null };"
+        }
+      ],
+      "adversarial": [
+        {
+          "path": "XmlParser.cs",
+          "source": "var mode = DtdProcessing.ParseMode;\nvar settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit };",
+          "expected": false,
+          "rationale": "A similarly named enum or identifier is not an assignment enabling DTD processing and must not be treated as parser configuration."
+        },
+        {
+          "path": "XmlParser.cs",
+          "source": "var resolver = new MyXmlUrlResolverFactory().Create();\nsettings.XmlResolver = resolver;",
+          "expected": false,
+          "rationale": "Computed resolver flow requires semantic analysis; the narrow rule stays silent rather than guessing that the custom resolver is unsafe."
+        }
+      ]
     }
   ]
 }

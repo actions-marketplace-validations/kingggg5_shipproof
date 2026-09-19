@@ -24,7 +24,7 @@ Discovery result: `READY_FOR_PLAN` and implemented under the approved plan. Eigh
 | ID | Workload/dataset | Environment/runtime | Metric | Baseline | Threshold/SLO | Result/uncertainty | Evidence | Status |
 |---|---|---|---|---|---|---|---|---|
 | PERF-1 | Existing 1,000-file synthetic scanner benchmark, three runs | Windows; Node 24.15.0; Python 3.12.10 | median/p95 seconds, peak RSS, output determinism | Prior 0.6813 s and 24.79 MB RSS | <= 5 s repository budget; <= 256 MB; identical sample digest/counts | Median 0.9747 s, p95 0.9879 s, peak RSS 25.57 MB; deterministic; local synthetic evidence only | `scripts/benchmark-scanner.py` | PASS |
-| PACK-1 | `npm pack --dry-run`/packed smoke fixture | Local npm/Node 24.15.0 | packed and unpacked bytes | Prior 111 files, 428774 packed, 1620931 unpacked | 500000 packed; 1800000 unpacked; exact allowlist | 113 files, 435220 packed, 1642530 unpacked; `.harness` excluded from artifact | package tests | PASS |
+| PACK-1 | `npm pack --dry-run`/packed smoke fixture | Local npm/Node 24.15.0 | packed and unpacked bytes | Prior 116 files, 475404 packed, 1797198 unpacked | 500000 packed; 1810000 unpacked; exact allowlist | 116 files, 477076 packed, 1801813 unpacked; `.harness` excluded from artifact; 10 KiB budget increment covers the trusted executable resolver | package tests | PASS |
 
 ## External audit evidence
 
@@ -34,7 +34,7 @@ Exit/error that means unavailable is never a pass.
 |---|---|---|---|---|---|
 | Harness doctor | `python .harness/runtime/scripts/memory_ops.py doctor --project . --logical-scope .` | 0.3.1 repository-pinned runtime | 0 / HEALTHY | Identity/store/runtime/writer-lock probes passed | Workflow QA is same-context, not independent. |
 | ShipProof doctor | `node bin/shipproof.mjs doctor . --json` | 0.10.0 candidate based on `c9785ab` | 0 / PASS | Runtime, repository, CI, policy, skills, lockfile detected | Structural preflight does not prove production readiness. |
-| ShipProof full gate | `npm run check` plus direct high-gate scan | 0.10.0 working tree | 0 / PASS_WITH_EVIDENCE | 602 Python tests plus 2 demo tests, all Node suites, 113-file package smoke, and 267-file self-scan pass with 0 findings | No independent reviewer or production runtime evidence. |
+| ShipProof full gate | `npm run check` plus direct high-gate scan | 0.10.0 working tree | 0 / PASS_WITH_EVIDENCE | 684 Python tests plus 2 demo tests, all Node suites, 116-file package smoke, and 369-file high-gate self-scan with 0 app findings | No independent reviewer or production runtime evidence. |
 
 ## P1 executable-rule contract evidence
 
@@ -71,7 +71,7 @@ Exit/error that means unavailable is never a pass.
 | Contract | Evidence | Result |
 |---|---|---|
 | Executable trust | Fixed commands/arguments; repository-contained TypeScript path; no shell | PASS |
-| Consent | TypeScript/Rust execution requires `--allow-project-code`; unapproved TypeScript discovery does not execute its version probe | PASS |
+| Consent | TypeScript/Rust execution requires `--allow-project-code`; unapproved discovery does not execute either version probe | PASS |
 | Availability/version | Tool-specific probes; empty/failing probe is unavailable; bounded analyzer version in report | PASS |
 | Failure classification | Findings, unavailable, timeout, output cap, signal/crash and unexpected exit are distinct | PASS |
 | Output safety | 2 MB child cap; 200 lines; 4,096 chars/line; credential-shaped diagnostics redacted | PASS |
@@ -94,3 +94,12 @@ Exit/error that means unavailable is never a pass.
 - Benchmark reports now include exact fixture bytes/digest, runtime identity, sample timings, sample file/finding counts, median, p95 and peak RSS; nondeterministic samples fail the budget.
 - Real-world Git runs are non-interactive and time-bounded with isolated system/global config plus an empty hook template. Fetch/revision/license failures return invalid evidence, never a skipped pass.
 - External boundary: the six-repository run proves immutable corpus and evaluator availability only. Clean-baseline findings still require human labels; no representative precision claim or detector promotion is made.
+
+## Release-blocker recheck — 2026-09-04
+
+- Input: the user-supplied report of 18 findings (2 critical, 15 high, 1 medium). The attachment was treated as untrusted audit data; its claims were reproduced against the current tree before changes were made.
+- Remediation: trusted absolute executable resolution for Python/Go/Rust; explicit consent and repository containment for the TypeScript adapter; fail-closed coverage ledger for parser, line, size, container, binary, symlink, and unreadable omissions; bounded findings/baseline/JSON inputs; repository-policy security floor; atomic and symlink-resistant report writes; terminal-control escaping; and direct regex-helper line-budget enforcement.
+- Default-gate follow-up: repository `scan`, the pre-commit hook, the GitHub Action, and MCP now fail closed on incomplete coverage by default; `--allow-incomplete` is a visible exploratory override and is not used by `check`.
+- Verification: `npm run check` PASS (lint, all Node suites, 684 Python tests plus 2 demo tests, package manifest, packed-artifact smoke). High-gate self-scan with `--max-file-bytes 10000000` returned `PASS_WITH_EVIDENCE`, exit 0, 369 files, 0 app findings, 29 test-scope findings, and a complete coverage ledger (10 intentional assets; no omission reasons). The default 1 MB exploratory scan still reports the five large research JSON files as `oversized`; this is explicit incomplete evidence, not a green bypass. An adversarial 200,000-character SQL line returned fail-closed `line_limit` evidence.
+- Harness: pinned runtime doctor `HEALTHY`; portability validation PASS. QA remains same-context self-review; no independent reviewer, production load/soak, DAST, fuzz, or hosted multi-runtime CI evidence was claimed.
+- Delivery state: local 0.10.0 candidate remains `WAITING_ACCEPTANCE`; tag, push, and public release remain separate explicit actions.

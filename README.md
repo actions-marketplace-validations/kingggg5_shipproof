@@ -12,7 +12,7 @@ Security · Correctness · Scale · Performance · Release evidence
 
 [![CI](https://github.com/kingggg5/shipproof/actions/workflows/ci.yml/badge.svg)](https://github.com/kingggg5/shipproof/actions/workflows/ci.yml)
 [![Security](https://github.com/kingggg5/shipproof/actions/workflows/security.yml/badge.svg)](https://github.com/kingggg5/shipproof/actions/workflows/security.yml)
-[![Release](https://img.shields.io/badge/release-v0.10.0-2563eb)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/release-v0.11.2-2563eb)](CHANGELOG.md)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933)](package.json)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -67,13 +67,13 @@ Node.js 20+ runs the front-door CLI. Python 3.10+ is needed for `scan`, `check`,
 
 ## Scope and project status
 
-ShipProof applies the same review contract regardless of who wrote the code. Its executable scanner currently contains **635 deterministic rules** for locally observable security, correctness, scale, performance, configuration, and supply-chain risks. The default path is read-only, offline, and dependency-free beyond Node.js and the Python standard library.
+ShipProof applies the same review contract regardless of who wrote the code. Its executable scanner currently contains **640 deterministic rules** for locally observable security, correctness, scale, performance, configuration, and supply-chain risks. The default path is read-only, offline, and dependency-free beyond Node.js and the Python standard library.
 
 | Property | Current contract |
 | :--- | :--- |
-| Current release | `v0.10.0` reviewed release |
+| Current release | `v0.11.2` reviewed release |
 | Runtime | Node.js 20+; Python 3.10+ for scanner-backed commands |
-| Executable rules | 635 (`SP001`–`SP665`, with deliberate reserved gaps) |
+| Executable rules | 640 (`SP001`–`SP670`, with deliberate reserved gaps) |
 | Evidence levels | `L0` pattern, `L1` structural/artifact, `L2` interprocedural taint (`--cross-file`; Python + JavaScript/TypeScript) |
 | Research inventory | 7,800 catalogued candidates plus 1,000 reserved promotion slots; none are findings until promoted |
 | Exit codes | `0` pass, `1` policy gate failure, `2` invalid or unavailable evidence |
@@ -152,7 +152,7 @@ Full prompt samples, invariant analysis, token cost budgeting, worktree isolatio
 
 ## Detection rules
 
-**635 deterministic executable rules** (`SP001`–`SP665`, with deliberate reserved gaps) across security, correctness, scale, performance, configuration, and supply-chain risks. Findings carry an evidence `proof_level`: `L0` pattern match, `L1` structural/AST/artifact evidence, and `L2` interprocedural taint flows (`--cross-file`; Python plus JavaScript/TypeScript route-to-sink chains since v0.8).
+**640 deterministic executable rules** (`SP001`–`SP670`, with deliberate reserved gaps) across security, correctness, scale, performance, configuration, and supply-chain risks. Findings carry an evidence `proof_level`: `L0` pattern match, `L1` structural/AST/artifact evidence, and `L2` interprocedural taint flows (`--cross-file`; Python plus JavaScript/TypeScript route-to-sink chains since v0.8).
 
 The complete catalog, severity, category, and detection method per rule, plus the ecosystem/framework mapping that decides where each structural check runs, lives in **[docs/rules.md](docs/rules.md)**.
 
@@ -160,9 +160,14 @@ The complete catalog, severity, category, and detection method per rule, plus th
 
 ShipProof prioritizes high precision over noisy alerts:
 
+For example, `SP631` requires an explicit Edge runtime declaration plus a native runtime import; ordinary Node.js code and prose mentioning a runtime or ledger are not Edge evidence. See the [rule boundary](docs/rules.md).
+
 - **Inline suppression:** Add `# shipproof-ignore SP101` or `// shipproof-ignore SP101` directly on the line or on the line immediately preceding it. The marker is honored only inside a comment (or at the start of a documentation line), never inside string data, and may list several rules at once (for example `# shipproof-ignore SP101 SP102`). Both the regex and the Python AST engines honor these markers.
-- **Confidence filtering:** Run with `--min-confidence high` to surface only confirmed, high-confidence issues.
-- **Reviewed baselines:** Record existing technical debt into `.shipproof-baseline.json` using `shipproof scan --baseline-out .shipproof-baseline.json`.
+- **Confidence filtering:** Run with `--min-confidence high` to surface high-confidence heuristic findings; these still require verification.
+- **Accuracy note:** Workflow findings depend on run-context interpolation, environment-file findings require a verified Git index (not `.gitignore` text), BullMQ findings require an explicit stalled-check opt-out, fetch findings require adjacent independent requests in the same component, and non-null findings require JSON-source dereference. No universal precision claim is implied.
+- **Reviewed baselines:** Generate `.shipproof-baseline.json` with `shipproof scan --baseline-out .shipproof-baseline.json --baseline-reason "Reviewed migration debt"`, then review it before using `--baseline`. Generation is not approval; the default reason explicitly says review is required.
+- **Auditable suppression:** Baselines (format version 2) combine exact finding fingerprints with reasoned glob rules. `--show-suppressed` reveals them in JSON, Markdown, terminal, or SARIF; SARIF marks them as external suppressions. Unknown fields, duplicate keys, invalid reasons, and oversized baselines fail with exit `2`. Fingerprints are not whole-file digests or signed approvals.
+- **Honest coverage:** Unreadable selected files/directories, parser limits, overlong source lines (over 8,192 characters), oversized source files, symlinks/reparse points, unknown binaries, and uninspected containers prevent a complete-pass verdict. Repository scans fail closed on incomplete coverage by default; the explicit `--fail-on-incomplete` flag remains accepted for readable command intent, while `--allow-incomplete` is an intentionally visible exploratory override. GitHub Action and MCP scan defaults are also strict (set their boolean to `false` only for a reviewed exploratory run; adapters translate that to `--allow-incomplete`). The production `check` command additionally ignores repository attempts to weaken the security floor or narrow scope, scans the full root, and fails closed. Incomplete evidence reports `CONDITIONAL` while the process exits `1`, so no omitted source can silently become a green gate. Coverage describes supported source inspection, not runtime safety. See [coverage and baseline contracts](docs/commands.md#coverage-and-baseline-contracts).
 
 ## Add the GitHub Action
 
@@ -178,12 +183,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: kingggg5/shipproof@v0.10.0
+      - uses: kingggg5/shipproof@v0.11.2
         with:
           fail-on: high
 ```
 
-The action writes a structured Markdown status card to the GitHub Step Summary. The example uses the `v0.10.0` release tag; pin the action to a reviewed full commit SHA when an immutable supply-chain reference is required.
+The action writes a structured Markdown status card to the GitHub Step Summary. The example uses the `v0.11.2` release tag; pin the action to a reviewed full commit SHA when an immutable supply-chain reference is required.
 
 For pull requests that touch a large repository, scan only what changed relative to the base branch:
 
@@ -191,7 +196,7 @@ For pull requests that touch a large repository, scan only what changed relative
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: kingggg5/shipproof@v0.10.0
+      - uses: kingggg5/shipproof@v0.11.2
         with:
           fail-on: high
           changed-since: origin/main
@@ -202,7 +207,7 @@ The scanner resolves the git diff (added, copied, modified, and renamed files, p
 The default report format is `sarif`, which the action writes into the workspace. To surface findings as inline Code Scanning alerts, upload that artifact with GitHub's official action after the gate step:
 
 ```yaml
-      - uses: kingggg5/shipproof@v0.10.0
+      - uses: kingggg5/shipproof@v0.11.2
         with:
           fail-on: high
           format: sarif
@@ -313,7 +318,7 @@ All detailed walkthroughs are in [docs/features.md](docs/features.md).
 
 ## Research & evaluation status
 
-The scanner ships 635 executable rules. Behind them sits a research backlog of 7,800 catalogued candidates. The current promotion triage identifies 934 targets with a possible local signature, 435 that need dataflow evidence beyond today's engines, and 1,595 design, process, or hardware classes that a regex-based gate cannot catch; the remaining catalog entries retain discovery status until their evidence boundary is reviewed. The bounded P2 batch-A record reviews 25 direct candidates across nine requested ecosystems: 3 reached research-only `fixture_ready`, 22 were rejected as duplicates or wrong evidence routes, and none was silently promoted without representative shadow metrics. See [the batch record](research/promotion-batch-a.json) and [the broader plan](research/promotion-plan.json).
+The scanner ships 640 executable rules. Behind them sits a research backlog of 7,800 catalogued candidates. The current promotion triage identifies 934 targets with a possible local signature, 435 that need dataflow evidence beyond today's engines, and 1,595 design, process, or hardware classes that a regex-based gate cannot catch; the remaining catalog entries retain discovery status until their evidence boundary is reviewed. The bounded P2 batch-A record reviews 25 direct candidates across nine requested ecosystems: 3 reached research-only `fixture_ready` and are mapped into the non-blocking SP666-SP668 wave; Wave D adds SP669-SP670 for Dart and C#/.NET; the other candidates remain research-only or rejected until their evidence boundary is met. See the [batch record](research/promotion-batch-a.json), [promotion waves](research/promotion-wave-b.md), and [broader plan](research/promotion-plan.json).
 
 Fixture battery (median of 3 runs, `--cross-file`, labels in [benchmarks/head-to-head-labels.json](benchmarks/head-to-head-labels.json)):
 
@@ -325,7 +330,7 @@ Fixture battery (median of 3 runs, `--cross-file`, labels in [benchmarks/head-to
 | adversarial-node | 1.0 | 1.0 | 1.0 |
 | secure-node-api / node-secure-crossfile |: |: | 0 findings |
 
-The version-2 label contract distinguishes expected finding locations from context-only source/helper files in a vulnerable chain. Those context files remain listed and hashed but do not count as false negatives for a sink-reporting detector. The adversarial corpus holds look-alikes inside comments and string literals that must stay silent, next to disguised chains (two-hop aliasing, destructured parameters, cookie-to-DOM, three-file taint) that must fire.
+The version-3 label contract distinguishes expected finding locations from context-only source/helper files in a vulnerable chain, and records the expected sink lines so line-level accuracy is measurable. Those context files remain listed and hashed but do not count as false negatives for a sink-reporting detector. The adversarial corpus holds look-alikes inside comments and string literals that must stay silent, next to disguised chains (two-hop aliasing, destructured parameters, cookie-to-DOM, three-file taint) that must fire.
 
 The opt-in real-world evaluator pins express, flask, and requests as clean baselines plus juice-shop, DVWA, and NodeGoat as intentionally vulnerable apps. The reviewed 2026-08-24 manifest run scanned 1,805 files and observed 310 application-scope findings (2 / 9 / 3 / 184 / 84 / 28 in that order). Every alert remains explicitly `unreviewed`; these inventory counts are not a real-world precision claim.
 
@@ -350,11 +355,11 @@ A research candidate becomes an executable `SPxxx` rule only after deduplication
 | [Expert candidate catalog](docs/rule-expansion-1000.md) | 1,000 model-assisted, source-mapped hypotheses | None |
 | [2021–2026 annual catalog](docs/rule-expansion-2021-2026.md) | 1,800 time-bounded CVE/CWE/community signals | None |
 | [Language catalog](docs/rule-expansion-languages-5000.md) | 5,000 deduplicated ecosystem/CWE research slots | None |
-| [Executable rule table](docs/rules.md#detection-rules-reference) | 635 reviewed detectors | Emits versioned findings |
+| [Executable rule table](docs/rules.md#detection-rules-reference) | 640 reviewed detectors | Emits versioned findings |
 
-The machine-derived [rule assurance inventory](docs/rule-assurance.md) verifies all 635 executable rules through explicit positive/negative/adversarial contracts. The checked-in debt baseline is empty and fail-closed: any new partial or uncontracted executable rule fails CI instead of silently joining legacy debt.
+The machine-derived [rule assurance inventory](docs/rule-assurance.md) verifies all 640 executable rules through explicit positive/negative/adversarial contracts. The checked-in debt baseline is empty and fail-closed: any new partial or uncontracted executable rule fails CI instead of silently joining legacy debt.
 
-See the [production playbook](docs/production-playbook.md), [development plan](docs/next-development-plan.md), and [delivery roadmap](docs/roadmap.md) for operational boundaries and acceptance gates. Cite a release using [CITATION.cff](CITATION.cff). ShipProof deliberately avoids a single readiness score because one veto-level failure must not be averaged away by many clean checks.
+See the [production playbook](docs/production-playbook.md), [development plan](https://github.com/kingggg5/shipproof/blob/main/docs/next-development-plan.md), and [delivery roadmap](docs/roadmap.md) for operational boundaries and acceptance gates. Cite a release using [CITATION.cff](CITATION.cff). ShipProof deliberately avoids a single readiness score because one veto-level failure must not be averaged away by many clean checks.
 
 ## Project governance
 

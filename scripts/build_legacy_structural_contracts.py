@@ -24,6 +24,7 @@ from scan_repo import (  # noqa: E402
     deduplicate_and_suppress_findings,
     find_python_ast_issues,
     find_regex_issues,
+    find_tracked_env_issues,
     scan_single_file,
 )
 
@@ -119,6 +120,7 @@ STRUCTURAL_CASES: dict[str, dict[str, str]] = {
         "positive": "for user in users:\n    profile = db.query(Profile).filter_by(user_id=user.id).first()\n",
         "negative_a": "profiles = db.query(Profile).filter(Profile.user_id.in_(user_ids)).all()\nfor profile in profiles:\n    use(profile)\n",
         "negative_b": "for user in users:\n    use(user.cached_profile)\n",
+        "negative_c": "import fnmatch\nfor name in names:\n    fnmatch.filter(names, '*.py')\n",
         "adversarial": "def load_profile(user):\n    return db.query(Profile).filter_by(user_id=user.id).first()\nfor user in users:\n    profile = load_profile(user)\n",
     },
     "SP316": {
@@ -202,14 +204,6 @@ STRUCTURAL_CASES: dict[str, dict[str, str]] = {
         "negative_b": "export default function Page() { return <div>static</div>; }\n",
         "adversarial": "const stateHook = useState;\nexport default function Page() { const [count] = stateHook(0); return <div>{count}</div>; }\n",
     },
-    "SP597": {
-        "ecosystem": "nextjs",
-        "path": "page.tsx",
-        "positive": "export default async function Page() {\n  const a = await fetch('https://a.invalid');\n  const b = await fetch('https://b.invalid');\n  return null;\n}\n",
-        "negative_a": "export default async function Page() {\n  const [a, b] = await Promise.all([fetch('https://a.invalid'), fetch('https://b.invalid')]);\n  return null;\n}\n",
-        "negative_b": "export default async function Page() {\n  const a = await fetch('https://a.invalid');\n  return null;\n}\n",
-        "adversarial": "const load = fetch;\nexport default async function Page() { const a = await load('https://a.invalid'); const b = await load('https://b.invalid'); return null; }\n",
-    },
     "SP598": {
         "ecosystem": "nextjs",
         "path": "route.ts",
@@ -246,11 +240,16 @@ STRUCTURAL_CASES: dict[str, dict[str, str]] = {
         "ecosystem": "nextjs",
         "path": "route.ts",
         "positive": "export const runtime = 'edge';\nimport fs from 'node:fs';\n",
-        "negative_a": "export const runtime = 'nodejs';\nimport fs from 'node:fs';\n",
+        "negative_a": "export const runtime = 'nodejs';\nimport fs from 'node:fs';\n// The completeness ledger is ordinary Node code.\n",
         "negative_b": "export const runtime = 'edge';\nexport async function GET() { return new Response('ok'); }\n",
         "adversarial": "export const runtime = ['ed', 'ge'].join('');\nimport fs from 'node:fs';\n",
     },
 }
+
+PRECISION_CASES = json.loads((ROOT / "tests" / "precision_cases.json").read_text(encoding="utf-8"))[
+    "cases"
+]
+PRECISION_RULE_IDS = {"SP210", "SP220", "SP583", "SP597", "SP599"}
 
 
 def encoded_text(source: str) -> dict[str, str]:
@@ -263,13 +262,20 @@ def rule_number(rule_id: str) -> int:
     return int(rule_id.removeprefix("SP"))
 
 
-def structural_findings(rule_id: str, path_value: str, source: str) -> list[Any]:
+def structural_findings(
+    rule_id: str, path_value: str, source: str, frameworks: list[str] | None = None
+) -> list[Any]:
+    detected = (
+        RULE_FRAMEWORK_HINTS.get(rule_id, frozenset())
+        if frameworks is None
+        else frozenset(frameworks)
+    )
     path = Path(path_value)
     findings = find_regex_issues(
         path,
         path_value,
         source,
-        detected_frameworks=RULE_FRAMEWORK_HINTS.get(rule_id, frozenset()),
+        detected_frameworks=detected,
     )
     if path.suffix.lower() == ".py":
         findings.extend(find_python_ast_issues(path_value, source))
@@ -281,6 +287,10 @@ def structural_case_path(rule_id: str, base: dict[str, str], case_id: str) -> st
     case_kind = case_id.split("-", 1)[0]
     filename = base.get(f"{case_kind}_path", base["path"])
     return f"contract-fixtures/{base['ecosystem']}/{rule_id.lower()}-{case_id}/{filename}"
+
+
+def precision_case_path(case: dict[str, Any]) -> str:
+    return f"contract-fixtures/precision/{case['rule_id'].lower()}/{case['kind']}-{case['name']}/{case['path']}"
 
 
 def positive_case(rule: Any, base: dict[str, str], case_id: str, source: str) -> dict[str, Any]:
@@ -309,7 +319,7 @@ def structural_entry(rule: Any, base: dict[str, str]) -> dict[str, Any]:
         for index, source in enumerate(positive_sources)
     ]
     negative = []
-    for case_id in ("negative_a", "negative_b"):
+    for case_id in sorted(key for key in base if key.startswith("negative_")):
         source = base[case_id]
         path = structural_case_path(rule.rule_id, base, case_id)
         if structural_findings(rule.rule_id, path, source):
@@ -418,11 +428,93 @@ def artifact_entry(rule: Any) -> dict[str, Any]:
     }
 
 
+def precision_entry(rule: Any, cases: list[dict[str, Any]]) -> dict[str, Any]:
+    out = {"positive": [], "negative": [], "adversarial": []}
+    for case in cases:
+        path = precision_case_path(case)
+        source = bytes.fromhex(case["source_hex"]).decode("utf-8")
+        if rule.rule_id == "SP220":
+            tracked = {path} if case.get("tracked_in_git") else set()
+            matches = find_tracked_env_issues({path}, tracked)
+        else:
+            matches = structural_findings(rule.rule_id, path, source, case.get("frameworks"))
+        if case["kind"] == "positive":
+            if len(matches) != 1:
+                raise ValueError(
+                    f"{rule.rule_id}:{case['name']} expected one finding, got {len(matches)}"
+                )
+            finding = matches[0]
+            out["positive"].append(
+                {
+                    "path": path,
+                    **encoded_text(source),
+                    "expected_line": finding.line,
+                    "expected_confidence": finding.confidence,
+                    "expected_detection": finding.detection,
+                    "expected_proof_level": finding.proof_level,
+                    "expected_fingerprint": finding.fingerprint,
+                    **(
+                        {"tracked_in_git": case["tracked_in_git"]}
+                        if "tracked_in_git" in case
+                        else {}
+                    ),
+                    **({"frameworks": case["frameworks"]} if "frameworks" in case else {}),
+                }
+            )
+        else:
+            if matches:
+                raise ValueError(f"{rule.rule_id}:{case['name']} unexpectedly triggers")
+            out[case["kind"]].append(
+                {
+                    "path": path,
+                    **encoded_text(source),
+                    **({"frameworks": case["frameworks"]} if "frameworks" in case else {}),
+                    **(
+                        {"tracked_in_git": case["tracked_in_git"]}
+                        if "tracked_in_git" in case
+                        else {}
+                    ),
+                    "expected": False,
+                    "rationale": f"The '{case['name']}' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim.",
+                }
+            )
+    return {
+        "rule_id": rule.rule_id,
+        "title": rule.title,
+        "category": rule.category,
+        "expected_severity": rule.severity,
+        "expected_confidence": rule.confidence,
+        "cwe": rule.cwe,
+        "frameworks": sorted(RULE_FRAMEWORK_HINTS.get(rule.rule_id, frozenset())),
+        "false_positive_analysis": RULE_EXPLANATIONS[rule.rule_id]["false_positive"],
+        "cases": out,
+    }
+
+
+def precision_artifact_entry(rule: Any) -> dict[str, Any]:
+    cases = [case for case in PRECISION_CASES if case["rule_id"] == "SP220"]
+    entry = precision_entry(rule, cases)
+    entry["frameworks"] = []
+    return entry
+
+
 def build_payloads() -> dict[str, str]:
     rules = {rule.rule_id: rule for rule in RULES}
     grouped: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
     for rule_id, base in sorted(STRUCTURAL_CASES.items(), key=lambda item: rule_number(item[0])):
+        if rule_id in PRECISION_RULE_IDS:
+            continue
         grouped[base["ecosystem"]].append(structural_entry(rules[rule_id], base))
+    for rule_id in sorted(PRECISION_RULE_IDS - {"SP220"}, key=rule_number):
+        ecosystem = {
+            "SP210": "infrastructure",
+            "SP583": "javascript",
+            "SP597": "nextjs",
+            "SP599": "typescript",
+        }[rule_id]
+        grouped[ecosystem].append(
+            precision_entry(rules[rule_id], [c for c in PRECISION_CASES if c["rule_id"] == rule_id])
+        )
     rendered: dict[str, str] = {}
     rows = []
     for ecosystem, entries in sorted(grouped.items()):
@@ -462,6 +554,29 @@ def build_payloads() -> dict[str, str]:
             "ecosystem": "sqlite",
             "rule_count": 1,
             "sha256": hashlib.sha256(artifact_content.encode("utf-8")).hexdigest(),
+        }
+    )
+    git_content = (
+        json.dumps(
+            {
+                "schema_version": 2,
+                "quality_contract_version": 2,
+                "engine": "artifact",
+                "ecosystem": "git",
+                "rules": [precision_artifact_entry(rules["SP220"])],
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    rendered["artifact-git.v2.json"] = git_content
+    rows.append(
+        {
+            "path": "artifact-git.v2.json",
+            "engine": "artifact",
+            "ecosystem": "git",
+            "rule_count": 1,
+            "sha256": hashlib.sha256(git_content.encode("utf-8")).hexdigest(),
         }
     )
     index = {

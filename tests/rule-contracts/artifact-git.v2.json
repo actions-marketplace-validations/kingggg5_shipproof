@@ -1,0 +1,105 @@
+{
+  "schema_version": 2,
+  "quality_contract_version": 2,
+  "engine": "artifact",
+  "ecosystem": "git",
+  "rules": [
+    {
+      "rule_id": "SP220",
+      "title": "Sensitive environment file tracked in git",
+      "category": "security",
+      "expected_severity": "high",
+      "expected_confidence": "high",
+      "cwe": "CWE-798",
+      "frameworks": [],
+      "false_positive_analysis": "Requires actual Git-index membership in the selected scan scope; .gitignore text, untracked files and example/template names do not qualify. A deliberately non-secret tracked .env still needs human review. Missing Git evidence is reported as incomplete coverage.",
+      "cases": {
+        "positive": [
+          {
+            "path": "contract-fixtures/precision/sp220/positive-root/.env",
+            "source_hex": "434f4e4649475f4d4f44453d6c6f63616c0a",
+            "expected_line": 1,
+            "expected_confidence": "high",
+            "expected_detection": "artifact",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "7059e4793b47d56719ee5c40",
+            "tracked_in_git": true
+          },
+          {
+            "path": "contract-fixtures/precision/sp220/positive-production/config/.env.production",
+            "source_hex": "434f4e4649475f4d4f44453d6c6f63616c0a",
+            "expected_line": 1,
+            "expected_confidence": "high",
+            "expected_detection": "artifact",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "92528598c0c027251bdb4a24",
+            "tracked_in_git": true
+          },
+          {
+            "path": "contract-fixtures/precision/sp220/positive-unicode/settings space/.env.local",
+            "source_hex": "434f4e4649475f4d4f44453d6c6f63616c0a",
+            "expected_line": 1,
+            "expected_confidence": "high",
+            "expected_detection": "artifact",
+            "expected_proof_level": "L1",
+            "expected_fingerprint": "366374799779fab3a4330810",
+            "tracked_in_git": true
+          }
+        ],
+        "negative": [
+          {
+            "path": "contract-fixtures/precision/sp220/negative-ignore-text/.gitignore",
+            "source_hex": "2e656e760a",
+            "tracked_in_git": true,
+            "expected": false,
+            "rationale": "The 'ignore-text' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp220/negative-untracked/.env",
+            "source_hex": "2e656e760a",
+            "tracked_in_git": false,
+            "expected": false,
+            "rationale": "The 'untracked' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp220/negative-example/.env.example",
+            "source_hex": "2e656e760a",
+            "tracked_in_git": true,
+            "expected": false,
+            "rationale": "The 'example' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp220/negative-template/.env.template",
+            "source_hex": "2e656e760a",
+            "tracked_in_git": true,
+            "expected": false,
+            "rationale": "The 'template' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp220/negative-source-reference/loader.py",
+            "source_hex": "2e656e760a",
+            "tracked_in_git": true,
+            "expected": false,
+            "rationale": "The 'source-reference' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          }
+        ],
+        "adversarial": [
+          {
+            "path": "contract-fixtures/precision/sp220/adversarial-nested-example/config/.env.production.example",
+            "source_hex": "4d4f44453d746573740a",
+            "tracked_in_git": true,
+            "expected": false,
+            "rationale": "The 'nested-example' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          },
+          {
+            "path": "contract-fixtures/precision/sp220/adversarial-untracked-production/.env.production",
+            "source_hex": "4d4f44453d746573740a",
+            "tracked_in_git": false,
+            "expected": false,
+            "rationale": "The 'untracked-production' fixture exercises a reviewed source, applicability or identity boundary. It must remain silent without all of this rule's required local evidence; it is not a general precision claim."
+          }
+        ]
+      }
+    }
+  ]
+}

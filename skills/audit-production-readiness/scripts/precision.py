@@ -25,6 +25,30 @@ L0_BLOCK_ALLOWLIST = frozenset(
 ADVISORY_RULE_IDS = frozenset(
     {
         "SP061",  # bare except / except Exception
+        "SP591",  # Client bundling boundary, not evidence of leaked credentials.
+        # These cohorts explicitly ship advisory pending representative labels.
+        "SP666",
+        "SP667",
+        "SP668",
+        "SP669",
+        "SP670",
+        "SP671",
+        "SP672",
+        "SP673",
+        "SP674",
+        "SP675",
+        "SP676",
+        "SP677",
+        "SP678",
+        "SP679",
+        "SP680",
+        "SP681",
+        "SP682",
+        "SP683",  # Declared version, not deployed PHP patch/attack evidence.
+        "SP684",  # Declared Node patch baseline; runtime/backports are unknown.
+        "SP685",  # Upstream support status, distinct from vendor support.
+        "SP686",  # Local protocol selection, not a negotiated connection.
+        "SP687",  # Local message cap, not demonstrated denial of service.
     }
 )
 
@@ -296,8 +320,10 @@ def context_allows(finding: Any, source_text: str, relative_path: str) -> bool:
             EXTERNAL_INPUT_RE.search(nearby_text(source_text, finding.line, 8))
         ):
             return False
-    if rule_id == "SP106" and re.search(
-        r"\b(?:bccache|cache|__pycache__|bytecache)\b", relative_path, re.IGNORECASE
+    if (
+        rule_id == "SP106"
+        and re.search(r"\b(?:bccache|cache|__pycache__|bytecache)\b", finding.path, re.IGNORECASE)
+        and not EXTERNAL_INPUT_RE.search(nearby_text(source_text, finding.line, 6))
     ):
         return False
     return not (

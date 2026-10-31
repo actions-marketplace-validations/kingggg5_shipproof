@@ -428,12 +428,12 @@
           },
           {
             "path": "contract-fixtures/common/sp110-positive-b.py",
-            "source_hex": "706174682e6a6f696e0920282020757365725f696e7075743b0a",
+            "source_hex": "6f732e706174682e6a6f696e20092820207265712e3b0a",
             "expected_line": 1,
             "expected_confidence": "medium",
             "expected_detection": "pattern",
             "expected_proof_level": "L0",
-            "expected_fingerprint": "c365b154a5d5d2369c80d4b4"
+            "expected_fingerprint": "796324011ad61337695a10a7"
           },
           {
             "path": "contract-fixtures/common/sp110-positive-c.py",
@@ -6418,47 +6418,6 @@
           {
             "path": "contract-fixtures/common/sp428-adversarial-a.ts",
             "source_hex": "5870702e7573650928092809657272092c09726571092c09726573092c096e6578742029203d3e097b207265732e73656e640928096572722e737461636b2029",
-            "expected": false,
-            "rationale": "A one-boundary near miss preserves most of the suspicious syntax while changing the detector's required token or delimiter; it records the current evasion and false-positive boundary without claiming data-flow reconstruction."
-          }
-        ]
-      }
-    },
-    {
-      "rule_id": "SP429",
-      "title": "Express express.json body parser without limit option",
-      "category": "scale",
-      "expected_severity": "medium",
-      "expected_confidence": "high",
-      "cwe": "CWE-400",
-      "frameworks": [],
-      "false_positive_analysis": "Test fixtures or local mock environments may trigger this rule; verify whether the code path runs in production.",
-      "cases": {
-        "positive": [
-          {
-            "path": "contract-fixtures/common/sp429-positive-a.ts",
-            "source_hex": "6170702e757365092809657870726573732e6a736f6e202820292029",
-            "expected_line": 1,
-            "expected_confidence": "high",
-            "expected_detection": "pattern",
-            "expected_proof_level": "L0",
-            "expected_fingerprint": "aaa34f2269f7a51c0e533ecf"
-          }
-        ],
-        "negative": [
-          {
-            "path": "contract-fixtures/common/sp429-negative-a.ts",
-            "source_hex": "2170702e757365092809657870726573732e6a736f6e202820292029"
-          },
-          {
-            "path": "contract-fixtures/common/sp429-negative-b.ts",
-            "source_hex": "2070702e757365092809657870726573732e6a736f6e202820292029"
-          }
-        ],
-        "adversarial": [
-          {
-            "path": "contract-fixtures/common/sp429-adversarial-a.ts",
-            "source_hex": "5870702e757365092809657870726573732e6a736f6e202820292029",
             "expected": false,
             "rationale": "A one-boundary near miss preserves most of the suspicious syntax while changing the detector's required token or delimiter; it records the current evasion and false-positive boundary without claiming data-flow reconstruction."
           }

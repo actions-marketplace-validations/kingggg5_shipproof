@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -92,7 +92,7 @@ jobs:
             --repeat 3 --format json \
             | tee benchmark-semgrep-comparison.json
       - name: Upload benchmark artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: shipproof-benchmarks-${{ github.run_id }}
           path: |
@@ -113,13 +113,13 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "20"
       - name: Set up Go
@@ -127,15 +127,16 @@ jobs:
         with:
           go-version: "1.24"
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
           toolchain: "1.85.0"
       - name: Clean-corpus precision evaluation
-        run: python scripts/eval-clean-corpus.py --json --labels | tee benchmark-clean-corpus.json
+        run: python scripts/eval-clean-corpus.py --paired --json --labels | tee benchmark-clean-corpus.json
       - name: Precision thresholds
-        run: python scripts/check-precision-trend.py --report benchmark-clean-corpus.json
+        run: python scripts/check-precision-trend.py --require-paired --report benchmark-clean-corpus.json
       - name: Upload clean-corpus artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && hashFiles('benchmark-clean-corpus.json') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: shipproof-clean-corpus-${{ github.run_id }}
           path: benchmark-clean-corpus.json

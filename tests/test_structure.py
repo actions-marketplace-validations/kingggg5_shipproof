@@ -56,8 +56,33 @@ class StructureTests(unittest.TestCase):
         self.assertTrue(
             all(value["optional"] for value in package["peerDependenciesMeta"].values())
         )
+        self.assertEqual(package["peerDependencies"]["zod"], "^3.25.76 || ^4.6.7")
+        lock = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
+        self.assertEqual(lock["packages"][""]["peerDependencies"], package["peerDependencies"])
         for risky_hook in ("preinstall", "install", "postinstall", "prepare"):
             self.assertNotIn(risky_hook, package["scripts"])
+
+    def test_mcp_ci_covers_both_peer_majors_and_real_packed_consumers(self):
+        ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        peer_job = ci.split("  mcp-peers:\n", 1)[1].split("  coverage:\n", 1)[0]
+        self.assertIn('node-version: ["20", "22", "24"]', peer_job)
+        self.assertIn('zod-version: ["3.25.76", "4.6.7"]', peer_job)
+        self.assertIn('SHIPPROOF_MCP_REQUIRE_PEERS: "1"', peer_job)
+        self.assertIn("run: npm run test:mcp", peer_job)
+        self.assertIn("run: npm run test:mcp:peers --", peer_job)
+        self.assertIn("--ignore-scripts", peer_job)
+
+    def test_coverage_command_retains_scope_and_exposes_test_progress(self):
+        package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+        command = package["scripts"]["test:python:coverage"]
+        self.assertIn("-s tests -p test_*.py -v", command)
+        self.assertIn(
+            "--append -m unittest discover -s examples/demo-api/fixtures/after/tests -v", command
+        )
+        self.assertIn("python -m coverage report && python -m coverage xml", command)
+        configuration = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        self.assertIn("branch = true", configuration)
+        self.assertIn("fail_under = 80", configuration)
 
     def test_machine_contracts_and_distribution_entrypoints_exist(self):
         for path in (
@@ -109,22 +134,6 @@ class StructureTests(unittest.TestCase):
             "docs/rules.md": (r"ShipProof applies (\d+) deterministic executable rules",),
             "docs/research.md": (r"\| Executable scanner rules \| (\d+) \|",),
             "docs/next-development-plan.md": (r"- executable scanner rules: (\d+)",),
-            "docs/releases/v0.10.0.md": (
-                r"All (\d+) executable scanner rules",
-                r"change the (\d+)-rule public catalog",
-            ),
-            "docs/releases/v0.11.0.md": (
-                r"All (\d+) executable scanner rules",
-                r"change the (\d+)-rule public catalog",
-            ),
-            "docs/releases/v0.11.1.md": (
-                r"All (\d+) executable scanner rules",
-                r"change the (\d+)-rule public catalog",
-            ),
-            "docs/releases/v0.11.2.md": (
-                r"All (\d+) executable scanner rules",
-                r"change the (\d+)-rule public catalog",
-            ),
         }
         for path, patterns in current_rule_claims.items():
             content = (ROOT / path).read_text(encoding="utf-8")
@@ -136,6 +145,13 @@ class StructureTests(unittest.TestCase):
                     len(RULES),
                     f"stale rule-count claim in {path}: {match.group(0)}",
                 )
+        # Published release notes describe their immutable artifact, not main.
+        # Counts verified from the four corresponding release tags.
+        for version in ("0.10.0", "0.11.0", "0.11.1", "0.11.2"):
+            note = (ROOT / "docs/releases" / f"v{version}.md").read_text(encoding="utf-8")
+            count = re.search(r"All (\d+) executable scanner rules", note)
+            self.assertIsNotNone(count, version)
+            self.assertEqual(int(count.group(1)), 635, version)
         self.assertIn("L2 interprocedural taint flows", llms)
         self.assertIn("--cross-file", llms)
 
@@ -177,17 +193,25 @@ class StructureTests(unittest.TestCase):
             for path in sorted((ROOT / ".github" / "workflows").glob("*.yml"))
         )
         expected = {
+            "actions/checkout": (
+                "3d3c42e5aac5ba805825da76410c181273ba90b1",
+                "v7.0.1",
+            ),
+            "actions/upload-artifact": (
+                "cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+                "v7.0.2",
+            ),
             "actions/setup-python": (
                 "5fda3b95a4ea91299a34e894583c3862153e4b97",
                 "v7.0.0",
             ),
             "actions/setup-node": (
-                "820762786026740c76f36085b0efc47a31fe5020",
-                "v7.0.0",
+                "949feb2413d6458794dcd2491c4babbbce0c15c1",
+                "v7.1.0",
             ),
             "github/codeql-action/(?:init|analyze|upload-sarif)": (
-                "db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28",
-                "v4.37.8",
+                "6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee",
+                "v4.39.0",
             ),
         }
         for action_pattern, expected_pin in expected.items():
@@ -196,6 +220,9 @@ class StructureTests(unittest.TestCase):
                 workflow_text,
             )
             self.assertTrue(matches, action_pattern)
+            self.assertEqual(
+                len(matches), len(re.findall(rf"uses: {action_pattern}@", workflow_text))
+            )
             self.assertEqual(set(matches), {expected_pin}, action_pattern)
 
     def test_dependabot_keeps_major_updates_out_of_bulk_groups(self):
@@ -206,6 +233,30 @@ class StructureTests(unittest.TestCase):
             config,
         )
         self.assertIsNotNone(npm_group)
+
+    def test_dependabot_groups_codeql_component_updates(self):
+        config = (ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8")
+        actions_config = config.split("  - package-ecosystem: github-actions\n", 1)[1].split(
+            "  - package-ecosystem:", 1
+        )[0]
+        self.assertIn(
+            "codeql-actions:\n        patterns:\n          - github/codeql-action/*",
+            actions_config,
+        )
+
+    def test_benchmarks_retain_failed_precision_report_without_weakening_gate(self):
+        workflow = (ROOT / ".github" / "workflows" / "benchmarks.yml").read_text(encoding="utf-8")
+        precision_step = workflow.split("      - name: Precision thresholds\n", 1)[1].split(
+            "      - name: Upload clean-corpus artifact\n", 1
+        )[0]
+        self.assertIn(
+            "run: python scripts/check-precision-trend.py --require-paired --report benchmark-clean-corpus.json",
+            precision_step,
+        )
+        self.assertNotIn("continue-on-error", precision_step)
+        upload_step = workflow.split("      - name: Upload clean-corpus artifact\n", 1)[1]
+        self.assertIn("if: always() && hashFiles('benchmark-clean-corpus.json') != ''", upload_step)
+        self.assertIn("path: benchmark-clean-corpus.json", upload_step)
 
     def test_skill_frontmatter_has_no_placeholders(self):
         for name in SKILL_NAMES:

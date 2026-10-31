@@ -616,13 +616,19 @@ def safe(page_size: int = Query(50, ge=1, le=100)): ...
             self.assertEqual(
                 main(["--snippet", "ev" + "al(request.args['q'])", "--snippet-file", "app.py"]), 1
             )
-            with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
-                baseline_out = Path(f.name)
-            try:
+            # This is a CLI branch contract, not the repository self-audit.
+            # Scanning cwd makes its cost depend on the growing fixture corpus
+            # and becomes pathological under branch instrumentation. CI keeps
+            # the full checkout self-audit as its own independent command.
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "app.py").write_text("def health():\n    return 'ok'\n", encoding="utf-8")
+                baseline_out = root / "baseline.json"
+                baseline_out.touch()  # Preserve the existing-output branch.
                 self.assertEqual(
                     main(
                         [
-                            ".",
+                            str(root),
                             "--format",
                             "json",
                             "--baseline-out",
@@ -636,9 +642,7 @@ def safe(page_size: int = Query(50, ge=1, le=100)): ...
                     0,
                 )
                 self.assertTrue(baseline_out.exists())
-            finally:
-                if baseline_out.exists():
-                    baseline_out.unlink()
+                self.assertIsInstance(json.loads(baseline_out.read_text(encoding="utf-8")), dict)
 
     def test_detect_frameworks_across_manifests(self):
         import tempfile
@@ -1331,7 +1335,7 @@ def safe(page_size: int = Query(50, ge=1, le=100)): ...
         self.assertNotIn("SP135", [f.rule_id for f in findings])
 
     def test_go_discarded_error_is_flagged(self):
-        source = "result, err := doThing()\n" + "_, _ " + "= result, err\n"
+        source = "result, err := doThing()\n" + "_ " + "= err\n"
         findings = self.findings("store.go", source)
         self.assertIn("SP136", [f.rule_id for f in findings])
 
@@ -1849,7 +1853,7 @@ def safe(page_size: int = Query(50, ge=1, le=100)): ...
 
     def test_sp621_rust_unwrap_in_route_handler(self):
         source = (
-            "async fn get_user(req: HttpRequest) -> HttpResponse {\n    let id = parse_id(&req)."
+            '#[actix_web::get("/users")]\nasync fn get_user(req: HttpRequest) -> HttpResponse {\n    let id = parse_id(&req).'
             + "unwrap();\n    HttpResponse::Ok().finish()\n}"
         )
         findings = self.findings("handler.rs", source)
@@ -1916,10 +1920,13 @@ def safe(page_size: int = Query(50, ge=1, le=100)): ...
         findings = self.findings("Http.cs", source)
         self.assertFalse(any(f.rule_id == "SP104" for f in findings))
 
-    def test_sp104_dart_trust_roots_disabled_is_flagged(self):
-        source = "final context = SecurityContext(withTrustedRoots: false);\n"
+    def test_sp104_dart_custom_trust_store_is_not_a_verification_bypass(self):
+        source = (
+            "final context = SecurityContext(withTrustedRoots: false);\n"
+            "context.setTrustedCertificates('private-ca.pem');\n"
+        )
         findings = self.findings("tls.dart", source)
-        self.assertTrue(any(f.rule_id == "SP104" for f in findings))
+        self.assertFalse(any(f.rule_id == "SP104" for f in findings))
 
     def test_sp104_dart_trust_roots_enabled_is_not_flagged(self):
         source = "final context = SecurityContext(withTrustedRoots: true);\n"

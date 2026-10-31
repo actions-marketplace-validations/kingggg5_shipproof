@@ -12,7 +12,7 @@
 
 [![CI](https://github.com/kingggg5/shipproof/actions/workflows/ci.yml/badge.svg)](https://github.com/kingggg5/shipproof/actions/workflows/ci.yml)
 [![Security](https://github.com/kingggg5/shipproof/actions/workflows/security.yml/badge.svg)](https://github.com/kingggg5/shipproof/actions/workflows/security.yml)
-[![Release](https://img.shields.io/badge/release-v0.11.2-2563eb)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/release-v0.12.0-2563eb)](CHANGELOG.md)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933)](package.json)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -21,7 +21,7 @@ ShipProof คือ production gate ที่พัฒนาขึ้นต้�
 
 ShipProof ไม่ใช่ certification, penetration test, formal proof หรือสิ่งทดแทน threat modeling เฉพาะผลิตภัณฑ์และ runtime test มันทำให้ assumption มองเห็นได้ รายงานความแข็งแรงของหลักฐานที่มี และคงอำนาจการตัดสินใจไว้ที่มนุษย์สำหรับ action ที่มีผลตามมา
 
-**แหล่งข้อมูลโครงการ:** [เว็บไซต์](https://shipproof-site.sjet2744.chatgpt.site/shipproof/) · [Commands](docs/commands.md) · [Contributing](CONTRIBUTING.md) · [Support](SUPPORT.md) · [Governance](GOVERNANCE.md) · [Security](SECURITY.md) · [Community validation](docs/community-validation.md) · [Research methodology](docs/research.md) · [Roadmap](docs/roadmap.md) · [Citation](CITATION.cff)
+**แหล่งข้อมูลโครงการ:** [เว็บไซต์](https://shipproof-site.sjet2744.chatgpt.site/shipproof/) · [Commands](docs/commands.md) · [Contributing](CONTRIBUTING.md) · [Support](SUPPORT.md) · [Governance](GOVERNANCE.md) · [Security](SECURITY.md) · [Community validation](https://github.com/kingggg5/shipproof/blob/main/docs/community-validation.md) · [Research methodology](https://github.com/kingggg5/shipproof/blob/main/docs/research.md) · [Roadmap](https://github.com/kingggg5/shipproof/blob/main/docs/roadmap.md) · [Citation](CITATION.cff)
 
 <p align="center">
   <img src="docs/assets/terminal-demo.svg" width="100%" alt="ShipProof terminal demo" />
@@ -65,13 +65,13 @@ Node.js 20+ ทำหน้าที่ CLI ส่วน Python 3.10+ จำเ�
 
 ## ขอบเขตและสถานะโครงการ
 
-ShipProof บังคับ review contract เดียวกันไม่ว่าใครเขียนโค้ด executable scanner ปัจจุบันมี **640 deterministic rules** สำหรับ security, correctness, scale, performance, configuration และ supply-chain risk ที่สังเกตได้ locally path เริ่มต้นเป็น read-only, offline และไม่มี dependency เกิน Node.js กับ Python standard library
+ShipProof บังคับ review contract เดียวกันไม่ว่าใครเขียนโค้ด executable scanner ปัจจุบันมี **656 deterministic rules** สำหรับ security, correctness, scale, performance, configuration และ supply-chain risk ที่สังเกตได้ locally path เริ่มต้นเป็น read-only, offline และไม่มี dependency เกิน Node.js กับ Python standard library
 
 | หัวข้อ | Contract ปัจจุบัน |
 | :--- | :--- |
-| Release ล่าสุด | `v0.11.2` reviewed release |
+| Release ล่าสุด | `v0.12.0` reviewed release |
 | Runtime | Node.js 20+; Python 3.10+ สำหรับคำสั่ง scanner-backed |
-| Executable rules | 640 (`SP001`–`SP670`, มีช่องว่างสงวนไว้ตั้งใจ) |
+| Executable rules | 656 (`SP001`–`SP687`, มีช่องว่างสงวนไว้ตั้งใจ) |
 | Evidence levels | `L0` pattern, `L1` structural/artifact, `L2` interprocedural taint (`--cross-file`; Python + JavaScript/TypeScript) |
 | Research inventory | 7,800 catalogued candidates และ reserved promotion slots 1,000 รายการ; ไม่มีอะไรเป็น finding จนกว่าจะ promote |
 | Exit codes | `0` ผ่าน, `1` gate fail, `2` evidence ไม่ถูกต้อง/ไม่พร้อม |
@@ -139,7 +139,29 @@ shipproof labs impact src/app.py   # blast radius แบบ experimental ก่�
 
 ## กฎการตรวจจับ
 
-**640 deterministic executable rules** (`SP001`–`SP670`, มีช่องสงวนไว้ตั้งใจ) ครอบคลุม security, correctness, scale, performance, configuration และ supply-chain risks ทุก finding มี evidence `proof_level`: `L0` pattern match, `L1` structural/AST/artifact และ `L2` interprocedural taint flows (`--cross-file`; Python plus JavaScript/TypeScript route-to-sink chains ตั้งแต่ v0.8)
+**656 deterministic executable rules** (`SP001`–`SP687`, มีช่องสงวนไว้ตั้งใจ) ครอบคลุม security, correctness, scale, performance, configuration และ supply-chain risks ทุก finding มี evidence `proof_level`: `L0` pattern match, `L1` structural/AST/artifact และ `L2` interprocedural taint flows (`--cross-file`; Python plus JavaScript/TypeScript route-to-sink chains ตั้งแต่ v0.8)
+
+โค้ดปัจจุบันเพิ่ม advisory checks สำหรับ Roblox/Luau ในไฟล์ `.lua`/`.luau`
+(`SP671`–`SP672`) และ Rust invalid reference initialization (`SP673`) พร้อม
+ตรวจ reqwest TLS configuration ผ่าน `SP104` ดู syntax ที่รองรับและข้อจำกัดใน
+[ตารางกฎ](docs/rules.md) จำนวนกฎนี้อ้างอิง checkout ปัจจุบัน ส่วน release notes
+อ้างอิง artifact ของ tag นั้น
+
+เพิ่ม TypeScript/JavaScript cohort `SP674`–`SP682` สำหรับ JWT, Node, Next.js,
+Electron และ Puppeteer โดยตรวจ runtime import และค่าที่ปิดการป้องกันอย่างชัดเจน
+กฎชุดนี้เป็น advisory; type-only import ไม่ trigger `SP591` และถอด `SP429`
+ที่แจ้ง default JSON parser ของ Express ผิด ดู [ขอบเขตกฎ](docs/rules.md) และ
+[บันทึกแหล่งข้อมูล/เทส](https://github.com/kingggg5/shipproof/blob/main/research/typescript-cohort-2026-10.md)
+
+อัปเดตข้อมูลแบบ offline วันที่ **22 ตุลาคม 2026** เพิ่ม PHP2Shell
+(`CVE-2026-109618`, `CVE-2026-109619`) ผ่าน `SP683` สำหรับ PHP version pin และ
+final official FPM/Apache image ที่ระบุชัด ไม่เดา runtime จาก Composer และไม่สรุปว่า
+เครื่องที่มี vendor backport ยังมีช่องโหว่ ต้องตรวจแพตช์และเวอร์ชันที่รันจริงเพิ่มเติม
+ดู [ขอบเขตการตรวจ PHP2Shell](docs/rules.md#php2shell-version-evidence)
+
+`SP684` ตรวจ Node.js pin ที่เก่ากว่าแพตช์เดือนตุลาคม 2026 และ `SP685` ตรวจสาขา upstream EOL ทั้งสองเป็น advisory ดู [รูปแบบที่รองรับและข้อจำกัด](docs/rules.md#nodejs-version-declarations)
+
+`SP686`/`SP687` เป็น advisory สำหรับการเลือก Node TLS แบบเก่า (ไม่ยืนยัน handshake) และ `ws maxPayload` literal ที่แปลง signed 32-bit แล้วไม่เป็นบวก; ถ้าไม่ระบุยังมี finite cap ส่วน C# typed-parameter `CookieOptions` ที่ตั้ง `HttpOnly`/`Secure` เป็น false ขยาย `SP056`/`SP084` เดิม เป็น local config ที่ middleware อาจ override ดู [ขอบเขต transport](docs/rules.md#transport-and-cookie-options)
 
 catalog ฉบับเต็ม, severity, category และวิธี detection ต่อกฎ พร้อม mapping ecosystem/framework ที่กำหนดว่า structural check แต่ละตัวรันที่ไหน: อยู่ที่ **[docs/rules.md](docs/rules.md)**
 
@@ -148,6 +170,8 @@ catalog ฉบับเต็ม, severity, category และวิธี detec
 ShipProof ให้ความสำคัญกับ precision สูงกว่า alert รก:
 
 ตัวอย่างเช่น `SP631` ต้องเห็นการประกาศ Edge runtime จริงพร้อม native runtime import; Node.js ปกติหรือข้อความที่พูดถึง runtime/ledger ไม่ใช่หลักฐานว่าใช้ Edge ดู [ขอบเขตกฎ](docs/rules.md)
+
+กฎต้องอาศัยบริบทของคำสั่งและ framework ที่เกี่ยวข้อง พร้อมเคสโค้ดปกติที่ต้องไม่เตือน ดู [ขอบเขตการตรวจ](docs/rules.md)
 
 - **Inline suppression:** เติม `# shipproof-ignore SP101` หรือ `// shipproof-ignore SP101` บนบรรทัดนั้นหรือบรรทัดก่อนหน้า marker มีผลเฉพาะใน comment เท่านั้น และระบุหลาย rule พร้อมกันได้ เช่น `# shipproof-ignore SP101 SP102`
 - **Confidence filtering:** รันด้วย `--min-confidence high` เพื่อเห็น heuristic findings ที่มี confidence สูง แต่ยังต้องตรวจสอบยืนยัน
@@ -170,7 +194,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: kingggg5/shipproof@v0.11.2
+      - uses: kingggg5/shipproof@v0.12.0
         with:
           fail-on: high
 ```
@@ -181,7 +205,7 @@ Action เขียน status card Markdown ลง GitHub Step Summary สำห
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: kingggg5/shipproof@v0.11.2
+      - uses: kingggg5/shipproof@v0.12.0
         with:
           fail-on: high
           changed-since: origin/main
@@ -265,18 +289,18 @@ Claude Code โหลด repository เป็น plugin ระหว่าง de
 
 ## วิธีวิจัยและ provenance
 
-ShipProof implement ขึ้นต้นแบบ independent references ถูกใช้เพื่อกำหนดคำถาม ศัพท์ และขอบเขตความปลอดภัยที่คาดหวัง; detector code ภายนอกและ ruleset ที่มี license จำกัดไม่ถูกคัดลอก [research notebook](docs/research.md) บันทึกหน้าที่ consult, คำถามที่ถาม, การตัดสินใจที่ retain และ claim ที่ไม่ infer ตั้งแต่ต้น
+ShipProof implement ขึ้นต้นแบบ independent references ถูกใช้เพื่อกำหนดคำถาม ศัพท์ และขอบเขตความปลอดภัยที่คาดหวัง; detector code ภายนอกและ ruleset ที่มี license จำกัดไม่ถูกคัดลอก [research notebook](https://github.com/kingggg5/shipproof/blob/main/docs/research.md) บันทึกหน้าที่ consult, คำถามที่ถาม, การตัดสินใจที่ retain และ claim ที่ไม่ infer ตั้งแต่ต้น
 
 candidate จาก research จะกลายเป็น executable `SPxxx` rule ได้หลัง deduplication, local invariant ที่สังเกตได้, bounded implementation, CWE/control mapping, remediation, false-positive analysis และ positive/negative/adversarial tests เท่านั้น severity สื่อ potential impact ของเงื่อนไขที่ match; proof level สื่อความแข็งแรงของหลักฐาน local: ไม่มีตัวไหนคือ probability of exploitation
 
 | Research artifact | ขอบเขต | ผลต่อ runtime |
 | :--- | :--- | :--- |
-| [Expert candidate catalog](docs/rule-expansion-1000.md) | 1,000 hypotheses จาก model-assisted mapped กับ source | ไม่มี |
-| [2021–2026 annual catalog](docs/rule-expansion-2021-2026.md) | 1,800 CVE/CWE/community signals | ไม่มี |
-| [Language catalog](docs/rule-expansion-languages-5000.md) | 5,000 research slots แยก ecosystem/CWE | ไม่มี |
-| [Executable rule table](docs/rules.md#detection-rules-reference) | 640 detectors ผ่าน review | Emit versioned findings |
+| [Expert candidate catalog](https://github.com/kingggg5/shipproof/blob/main/docs/rule-expansion-1000.md) | 1,000 hypotheses จาก model-assisted mapped กับ source | ไม่มี |
+| [2021–2026 annual catalog](https://github.com/kingggg5/shipproof/blob/main/docs/rule-expansion-2021-2026.md) | 1,800 CVE/CWE/community signals | ไม่มี |
+| [Language catalog](https://github.com/kingggg5/shipproof/blob/main/docs/rule-expansion-languages-5000.md) | 5,000 research slots แยก ecosystem/CWE | ไม่มี |
+| [Executable rule table](docs/rules.md#detection-rules-reference) | 656 detectors ผ่าน review | Emit versioned findings |
 
-ดู [production playbook](docs/production-playbook.md), [development plan](https://github.com/kingggg5/shipproof/blob/main/docs/next-development-plan.md) และ [delivery roadmap](docs/roadmap.md) สำหรับขอบเขต operational และ acceptance gates อ้างอิง release ด้วย [CITATION.cff](CITATION.cff)
+ดู [production playbook](docs/production-playbook.md), [development plan](https://github.com/kingggg5/shipproof/blob/main/docs/next-development-plan.md) และ [delivery roadmap](https://github.com/kingggg5/shipproof/blob/main/docs/roadmap.md) สำหรับขอบเขต operational และ acceptance gates อ้างอิง release ด้วย [CITATION.cff](CITATION.cff)
 
 ## การกำกับดูแลโครงการ
 
@@ -291,9 +315,9 @@ npm run check
 python skills/audit-production-readiness/scripts/scan_repo.py . --fail-on high
 ```
 
-Core runtime ใช้แค่ Node กับ Python standard library; Ruff เป็น dev-only CI ทดสอบ Node 20/22/24 และ Python 3.10/3.11/3.12/3.13/3.14, ตรวจ package allowlist แบบเป๊ะ, smoke-test packed artifact และรัน CodeQL สำหรับ Python กับ JavaScript/TypeScript
+Core runtime ใช้แค่ Node กับ Python standard library; Ruff เป็น dev-only ส่วน MCP adapter แบบ optional ใช้ MCP SDK และรองรับ Zod 3 กับ 4 (`^3.25.76 || ^4.6.7`) โดยติดตั้ง peers เอง CI ทดสอบ Node 20/22/24 และ Python 3.10/3.11/3.12/3.13/3.14, ตรวจ package allowlist แบบเป๊ะ, smoke-test packed artifact และรัน CodeQL สำหรับ Python กับ JavaScript/TypeScript
 
-scoped npm manifest และ manual OIDC workflow พร้อมสำหรับ public npm release ในอนาคต แต่จนกว่าเจ้าของจะสร้าง package, protected environment และ trusted-publisher relationship ให้ใช้วิธีติดตั้งจาก GitHub ด้านบนก่อน โครงการไม่อ้างว่าเผยแพร่ package ที่ยังไม่มีใน registry ดู [docs/releasing.md](docs/releasing.md) สำหรับ release discipline
+scoped npm manifest และ manual OIDC workflow พร้อมสำหรับ public npm release ในอนาคต แต่จนกว่าเจ้าของจะสร้าง package, protected environment และ trusted-publisher relationship ให้ใช้วิธีติดตั้งจาก GitHub ด้านบนก่อน โครงการไม่อ้างว่าเผยแพร่ package ที่ยังไม่มีใน registry ดู [docs/releasing.md](https://github.com/kingggg5/shipproof/blob/main/docs/releasing.md) สำหรับ release discipline
 
 ## License, citation และ security
 
